@@ -6,7 +6,6 @@
 
 - **接口地址**：`/api/user/register/`
 - **请求方法**：`POST`
-- **Content-Type**：`application/json`
 - **请求体格式**：
 ```json
 {
@@ -51,7 +50,6 @@
 
 - **接口地址**：`/api/user/login/`
 - **请求方法**：`POST`
-- **Content-Type**：`application/json`
 - **请求体格式**：
 ```json
 {
@@ -95,7 +93,6 @@
 ## 通用说明
 
 1. **请求格式要求**：
-   - Content-Type: application/json
    - 请求体必须是合法的 JSON 格式
    - 所有接口的 URL 都以斜杠（/）结尾
 

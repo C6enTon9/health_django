@@ -1,116 +1,89 @@
-from rest_framework import status
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
-from rest_framework.authtoken.models import Token
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, login
+from django.http import JsonResponse
 from .models import User
+import json
 
-class RegisterView(APIView):
-    permission_classes = [AllowAny]
+def register(request):
+    """
+    用户注册接口
+    """
+    if request.method != 'POST':
+        return JsonResponse({'code': 400, 'message': '只支持POST请求'})
     
-    def post(self, request):
-        try:
-            data = request.data
-            user_id = data.get('user_id')
-            password = data.get('password')
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+        password = data.get('password')
+        
+        # 验证数据
+        if not user_id or not password:
+            return JsonResponse({'code': 400, 'message': '用户ID和密码不能为空'})
             
-            # 验证必填字段
-            if not user_id or not password:
-                return Response({
-                    'code': 400,
-                    'message': '用户ID和密码不能为空'
-                }, status=status.HTTP_400_BAD_REQUEST)
-                
-            # 检查用户是否已存在
-            if User.objects.filter(user_id=user_id).exists():
-                return Response({
-                    'code': 400,
-                    'message': '用户ID已存在'
-                }, status=status.HTTP_400_BAD_REQUEST)
-                
-            # 创建新用户
-            user = User(user_id=user_id)
-            user.set_password(password)
-            user.save()
+        # 检查用户是否已存在
+        if User.objects.filter(user_id=user_id).exists():
+            return JsonResponse({'code': 400, 'message': '用户ID已存在'})
             
-            # 创建token
-            token, _ = Token.objects.get_or_create(user=user)
-            
-            return Response({
-                'code': 200,
-                'message': '注册成功',
-                'data': {
-                    'user_id': user.user_id,
-                    'token': token.key
-                }
-            }, status=status.HTTP_201_CREATED)
-            
-        except Exception as e:
-            return Response({
-                'code': 500,
-                'message': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # 创建新用户
+        user = User.objects.create_user(user_id=user_id, password=password)
+        
+        return JsonResponse({
+            'code': 200,
+            'message': '注册成功',
+            'data': {'user_id': user.user_id}
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'code': 400, 'message': '无效的JSON数据'})
+    except Exception as e:
+        return JsonResponse({'code': 500, 'message': str(e)})
 
-class LoginView(APIView):
-    permission_classes = [AllowAny]
+def login_view(request):
+    """
+    用户登录接口
+    """
+    if request.method != 'POST':
+        return JsonResponse({'code': 400, 'message': '只支持POST请求'})
     
-    def post(self, request):
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+        password = data.get('password')
+        
+        # 验证数据
+        if not user_id or not password:
+            return JsonResponse({'code': 400, 'message': '用户ID和密码不能为空'})
+            
+        # 检查用户是否存在
         try:
-            data = request.data
-            user_id = data.get('user_id')
-            password = data.get('password')
+            user = User.objects.get(user_id=user_id)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'code': 401,
+                'message': '用户不存在'
+            })
             
-            # 验证数据
-            if not user_id or not password:
-                return Response({
-                    'code': 400,
-                    'message': '用户ID和密码不能为空'
-                }, status=status.HTTP_400_BAD_REQUEST)
-                
-            # 验证用户
-            try:
-                user = User.objects.get(user_id=user_id)
-                if not user.check_password(password):
-                    return Response({
-                        'code': 401,
-                        'message': '用户ID或密码错误'
-                    }, status=status.HTTP_401_UNAUTHORIZED)
-            except User.DoesNotExist:
-                return Response({
-                    'code': 401,
-                    'message': '用户ID或密码错误'
-                }, status=status.HTTP_401_UNAUTHORIZED)
-            
-            # 创建或获取token
-            token, _ = Token.objects.get_or_create(user=user)
-            
-            return Response({
-                'code': 200,
-                'message': '登录成功',
-                'data': {
-                    'user_id': user.user_id,
-                    'token': token.key
+        # 验证用户
+        user = authenticate(request, username=user_id, password=password)
+        if user is None:
+            return JsonResponse({
+                'code': 401,
+                'message': '用户ID或密码错误',
+                'debug': {
+                    'user_id': user_id,
+                    'user_password_length': len(password) if password else 0
                 }
             })
             
-        except Exception as e:
-            return Response({
-                'code': 500,
-                'message': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-class LogoutView(APIView):
-    def post(self, request):
-        try:
-            # 删除用户token
-            request.user.auth_token.delete()
-            return Response({
-                'code': 200,
-                'message': '退出登录成功'
-            })
-        except Exception as e:
-            return Response({
-                'code': 500,
-                'message': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # 登录用户
+        login(request, user)
+        
+        return JsonResponse({
+            'code': 200,
+            'message': '登录成功',
+            'data': {'user_id': user.user_id}
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'code': 400, 'message': '无效的JSON数据'})
+    except Exception as e:
+        return JsonResponse({'code': 500, 'message': str(e)}) 
