@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'user',
+    'information',
+    'plan',
 ]
 
 MIDDLEWARE = [
@@ -141,6 +143,3 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ],
 }
-
-# 自定义用户模型
-AUTH_USER_MODEL = 'user.User'
