@@ -100,7 +100,7 @@ def upd_age(request):
 def get_age(request):
     # 获取数据
     data = json.loads(request.body)
-    user_id = request.GET.get("user_id")
+    user_id = data.get("user_id")
     # 验证数据
     if user_id is None:
         return JsonResponse({"code": 300, "message": "缺少必要参数"})
@@ -134,7 +134,7 @@ def upd_information(request):
 def get_information(request):
     # 获取数据
     data = json.loads(request.body)
-    user_id = request.GET.get("user_id")
+    user_id = data.get("user_id")
     # 验证数据
     if user_id is None:
         return JsonResponse({"code": 300, "message": "缺少必要参数"})
@@ -170,7 +170,7 @@ def upd_target(request):
 def get_target(request):
     # 获取数据
     data = json.loads(request.body)
-    user_id = request.GET.get("user_id")
+    user_id = data.get("user_id")
     # 验证数据
     if user_id is None:
         return JsonResponse({"code": 300, "message": "缺少必要参数"})
