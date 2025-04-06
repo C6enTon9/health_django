@@ -182,3 +182,11 @@ def get_target(request):
     return JsonResponse(
         {"code": 200, "message": "目标获取成功", "data": {"target": target}}
     )
+
+def get_all_information(user_id):
+    # 获取数据
+    information_obj = Information.objects.get(user_id=user_id)
+    if not information_obj:
+        return ""
+    information = f"身高: {information_obj.height} 厘米, 体重: {information_obj.weight} 公斤, 年龄: {information_obj.age} 岁, 信息: {information_obj.information}, 目标: {information_obj.target}"
+    return information

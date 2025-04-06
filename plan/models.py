@@ -8,3 +8,4 @@ class Plan(models.Model):
     day = models.IntegerField()
     start_date = models.DateField()
     end_date = models.DateField()
+    is_completed = models.BooleanField(default=False)
