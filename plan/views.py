@@ -1,11 +1,11 @@
 from django.shortcuts import render
 import json
-from models import Plan
-from ..information.models import Information
-from ..information.views import get_all_information
+from .models import Plan
+from information.models import Information
+from information.views import get_all_information
 from django.http import JsonResponse
-from ..ai.deepseek import chat
-from ..ai.response2plan import parse_plans
+from ai.deepseek import chat
+from ai.response2plan import parse_plans
 
 
 def get_plan(request):
