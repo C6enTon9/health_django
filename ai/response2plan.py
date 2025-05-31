@@ -1,5 +1,5 @@
 from datetime import datetime, time
-from typing import List
+from typing import List,Optional
 
 class Plan:
     def __init__(self, thing: str, description: str, day: int, start_time: time, end_time: time):
@@ -12,7 +12,7 @@ class Plan:
     def __repr__(self):
         return f"Plan(day={self.day}, {self.start_time}-{self.end_time}, {self.thing})"
 
-def parse_plans(input_text: str) -> List[Plan]:
+def parse_plans(input_text: Optional[str]) -> List[Plan]:
     """
     将输入的标准化计划文本解析为 Plan 实例列表。
     
@@ -21,6 +21,9 @@ def parse_plans(input_text: str) -> List[Plan]:
     p1: 08:00; 10:00; 晨跑; 在公园跑步 5 公里;
     """
     plans = []
+    if not input_text:
+        print("无response")
+        return []
     lines = input_text.strip().splitlines()
 
     for line in lines:

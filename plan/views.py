@@ -41,7 +41,7 @@ def upd_plan(request):
     information.information = information.information + new_info
     information.save()
     message = get_all_information(user_id)
-    make_plan.makeplan(user_id, message)
+    make_plan(user_id, message)
     return JsonResponse({"code": 200, "message": "更新计划成功"})
 
 
@@ -55,8 +55,8 @@ def make_plan(user_id, information):
             thing=plan.thing,
             description=plan.description,
             day=plan.day,
-            start_date=plan.start_date,
-            end_date=plan.end_date,
+            start_time=plan.start_time,
+            end_time=plan.end_time,
             is_completed=False,
         )
         plan_instance.save()
