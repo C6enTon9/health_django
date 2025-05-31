@@ -40,5 +40,5 @@ python manage.py createsuperuser
 ### 6. 运行后端
 
 ```bash
-python manage.py runserver
+run.bat
 ```

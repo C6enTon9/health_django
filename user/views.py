@@ -19,10 +19,12 @@ def register(request):
     # 业务逻辑
     if User.objects.filter(user_id=user_id).exists():
         return JsonResponse({"code": 400, "message": "用户ID已存在"})
-    user = User.objects.create_user(user_id=user_id, password=password)
-    information = Information.objects.create(
+    user=User(user_id=user_id, password=password)
+    user.save()
+    information = Information(
         user_id=user_id, information="", height=0, weight=0, age=0
     )
+    information.save()
     return JsonResponse(
         {"code": 200, "message": "注册成功", "data": {"user_id": user.user_id}}
     )
