@@ -10,7 +10,7 @@ from rest_framework import status
 from openai.types.chat import ChatCompletionMessageParam
 
 from information.services import update_user_info, get_user_info
-from plan.services import create_or_update_plans, get_user_plans, delete_plan
+from plan.services import create_or_update_plans, get_user_plans, delete_plan, delete_all_plans
 from core.types import ServiceResult
 from .services import client
 
@@ -21,6 +21,7 @@ AVAILABLE_TOOLS = {
     "create_or_update_plans": create_or_update_plans,
     "get_user_plans": get_user_plans,
     "delete_plan": delete_plan,
+     "delete_all_plans": delete_all_plans,
 }
 
 # 编写所有工具的 JSON 定义
@@ -60,18 +61,18 @@ tools_definition = [
         "type": "function",
         "function": {
             "name": "create_or_update_plans",
-            "description": "为用户创建或更新一个周常计划，可以是运动或饮食。必须提供描述。",
+            "description": "为用户创建或更新一个周常的健康计划条目。可以是运动活动，也可以是饮食安排。",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "title": {"type": "string", "description": "计划标题。运动是'跑步'，饮食是'早餐'等。"},
-                    "description": {"type": "string", "description": "详细描述。饮食必须包含食物，运动可描述地点强度。"},
-                    "day_of_week": {"type": "integer", "description": "星期几(1-7)。"},
-                    "start_time": {"type": "string", "description": "开始时间 'HH:MM'。"},
-                    "end_time": {"type": "string", "description": "结束时间 'HH:MM'。"},
-                    "id": {"type": "integer", "description": "仅在更新时提供ID。"},
+                    "title": { "type": "string", "description": "计划标题。" },
+                    "description": { "type": "string", "description": "计划描述。" },
+                    "day_of_week": { "type": "integer", "description": "星期几(1-7)。" },
+                    "start_time": { "type": "string", "description": "开始时间 'HH:MM'。" },
+                    "end_time": { "type": "string", "description": "结束时间 'HH:MM'。" },
+                    "id": { "type": "integer", "description": "仅在更新时提供ID。" },
                 },
-                "required": ["title", "day_of_week", "start_time", "end_time", "description"]
+                "required": ["title", "day_of_week", "start_time", "end_time"]
             }
         }
     },
@@ -97,6 +98,22 @@ tools_definition = [
                 "required": ["plan_id"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_all_plans",
+            "description": "一次性清空或删除用户的所有计划。当用户说'清空我的计划'、'删除全部'或'重置计划'时使用。比逐一删除更高效。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "day_of_week": {
+                        "type": "integer",
+                        "description": "如果提供，则只清空指定星期的计划。"
+                    }
+                },
+            }
+        }
     }
 ]
 
@@ -104,30 +121,29 @@ def rebuild_and_validate_messages(history: List[Dict[str, Any]], new_user_messag
     """
     接收前端传来的历史记录和新消息，将其重构为 OpenAI API 能接受的干净格式。
     """
-    system_prompt = """你是一个能干、简洁的个人健康助理。
+    # --- 这是最核心的修改：重写系统提示 ---
+    system_prompt = """你是一个积极主动、富有创意的顶级私人健康教练。
 
-        **你的核心任务是调用工具来管理用户的健康计划，并用自然语言进行回复。**
+    **你的核心行为准则：**
+    1.  **主动性**: 当用户提出模糊的请求，尤其是第一次要求“制定计划”时，**你绝不能反问用户要细节**。你必须主动地、像一个专家一样，为用户生成一个全面、均衡的、为期一周的默认健康计划。
+    2.  **效率**: 在生成默认计划后，你必须使用**并行工具调用 (Parallel Tool Calling)**，在**一轮对话**中，一次性地请求创建所有计划（例如，周一到周日的运动和饮食）。
+    3.  **简洁性**: 在所有工具调用成功后，你只需向用户做一个简单的总结性回复，例如：“好的，我已经为您规划好了一整周的健康计划，您可以在计划页面查看详情。” **不要**逐条复述你创建的计划。
 
-        **【行为准则】**
+    **【默认一周健康计划模板 (供你参考和发挥)】**
+    - **周一**: 早上 晨跑 (30分钟), 晚上 拉伸 (15分钟)
+    - **周二**: 晚上 力量训练 (60分钟)
+    - **周三**: 早上 瑜伽 (30分钟), 晚上 轻度有氧 (如快走)
+    - **周四**: 晚上 力量训练 (60分钟)
+    - **周五**: 早上 游泳 (45分钟)
+    - **周六**: 户外活动 (如登山或骑行)
+    - **周日**: 休息或主动恢复 (如散步)
+    - **饮食**: 每天规律三餐，并为每餐提供健康的、低脂高蛋白的食物建议作为 `description`。例如，早餐可以是“燕麦和水果”，午餐“鸡胸肉沙拉”，晚餐“鱼和蔬菜”。
 
-        **1. 关于工具调用:**
-           - 你可以创建、更新、查询、删除用户的运动和饮食计划。
-           - **创建/更新计划时 (`create_or_update_plans`)，必须提供 `description` 字段。**
-           - **删除计划时 (`delete_plan`)，必须先通过 `get_user_plans` 获取 `plan_id` 并与用户确认。**
+    **【具体指令】**
+    - 当用户说“帮我制定计划”、“给我一个计划”或类似的话时，立即启动上述的“主动规划”模式。
+    - 只有当用户提出**非常具体**的请求，比如“帮我加一个周五晚上的跑步计划”时，你才处理这一个具体的请求。
 
-        **2. 关于回复用户 (最重要！):**
-           - 当你调用**创建、更新或删除**计划的工具 (`create_or_update_plans`, `delete_plan`) 并从工具那里收到了一个表示**成功**的 JSON 结果 (例如 `{"code": 200, ...}`) 后：
-             - **你绝对不准将这个 JSON 结果的任何部分（如 'code', 'data', 'id'）直接展示或复述给用户。**
-             - 你**必须**根据操作的类型，生成一句**全新的、自然的、总结性的确认话语**。
-
-           - **回复范例 (必须严格遵守):**
-             - **创建成功后**: 不要说 "已创建，ID是103"，而是说 "好的，我已经为您安排好了周一的晨跑计划。" 或者 "没问题，您的早餐计划已经添加。"
-             - **更新成功后**: 不要说 "更新成功，updated: 1"，而是说 "好的，我已经将您的计划更新为晚上8点健身。"
-             - **删除成功后**: 不要说 "已删除，deleted: 1"，而是说 "好的，我已经帮您取消了那个计划。"
-
-           - **只有在调用查询工具 (`get_user_plans`) 时**，你才需要将查询到的计划内容（标题、时间等）以清晰的列表形式展示给用户，以便他们进行后续操作。
-
-        请严格遵循以上所有规则，尤其是关于**如何回复用户**的规则。"""
+    请严格遵循以上所有规则，展现出你作为一名顶级教练的专业性和主动性。"""
 
     rebuilt_messages: List[ChatCompletionMessageParam] = [{"role": "system", "content": system_prompt}]
 

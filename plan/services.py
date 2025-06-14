@@ -116,3 +116,27 @@ def delete_plan(user_id: int, plan_id: int) -> ServiceResult:
         return {"code": 404, "message": f"ID为 {plan_id} 的计划不存在或您无权删除。", "data": None}
     except Exception as e:
         return {"code": 500, "message": f"删除计划时发生错误: {e}", "data": None}
+    
+def delete_all_plans(user_id: int, day_of_week: Optional[int] = None) -> ServiceResult:
+    """
+    删除一个用户的所有计划。
+    如果提供了 day_of_week，则只删除那一天的所有计划。
+    """
+    try:
+        plans_to_delete = Plan.objects.filter(user_id=user_id)
+        if day_of_week is not None:
+            plans_to_delete = plans_to_delete.filter(day_of_week=day_of_week)
+        
+        # .delete() 返回一个元组，第一个元素是删除的数量
+        deleted_count, _ = plans_to_delete.delete()
+        
+        if deleted_count > 0:
+            message = f"成功清空了 {deleted_count} 条计划。"
+            if day_of_week:
+                message = f"成功清空了星期 {day_of_week} 的 {deleted_count} 条计划。"
+            return {"code": 200, "message": message, "data": {"deleted": deleted_count}}
+        else:
+            return {"code": 200, "message": "您没有任何需要清空的计划。", "data": {"deleted": 0}}
+            
+    except Exception as e:
+        return {"code": 500, "message": f"清空计划时发生错误: {e}", "data": None}
