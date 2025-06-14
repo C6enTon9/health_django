@@ -1,3 +1,4 @@
+from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
@@ -140,3 +141,74 @@ def delete_all_plans(user_id: int, day_of_week: Optional[int] = None) -> Service
             
     except Exception as e:
         return {"code": 500, "message": f"清空计划时发生错误: {e}", "data": None}
+    
+@transaction.atomic
+def create_bulk_plans(user_id: int, plans_data: list[dict[str, Any]]) -> ServiceResult:
+    """
+    一次性批量创建多个计划。
+    'plans_data' 是一个包含多个计划字典的列表。
+    """
+    User = get_user_model()
+    try:
+        user_instance = User.objects.get(id=user_id)
+        
+        # 准备要批量创建的 Plan 对象列表
+        plans_to_create = []
+        for plan_dict in plans_data:
+            # 基础校验
+            if not all(k in plan_dict for k in ['title', 'day_of_week', 'start_time', 'end_time']):
+                continue # 如果缺少核心字段，就跳过这个计划
+            
+            plans_to_create.append(
+                Plan(
+                    user=user_instance,
+                    title=plan_dict.get('title'),
+                    description=plan_dict.get('description', ''),
+                    day_of_week=plan_dict.get('day_of_week'),
+                    start_time=plan_dict.get('start_time'),
+                    end_time=plan_dict.get('end_time'),
+                )
+            )
+        
+        if not plans_to_create:
+            return {"code": 300, "message": "没有提供任何有效的计划数据以供创建。", "data": None}
+
+        # 使用 Django ORM 的 bulk_create 高效插入
+        Plan.objects.bulk_create(plans_to_create)
+        
+        count = len(plans_to_create)
+        return {"code": 201, "message": f"成功为您批量创建了 {count} 条新计划。", "data": {"created": count}}
+
+    except User.DoesNotExist:
+        return {"code": 404, "message": f"用户不存在。", "data": None}
+    except Exception as e:
+        return {"code": 500, "message": f"批量创建计划时发生错误: {e}", "data": None}
+    
+def get_recent_plans(user_id: int, limit: int = 5) -> ServiceResult:
+    """
+    获取用户最近完成或更新的N条计划。
+    """
+    try:
+        # 按更新时间倒序排序，并取前 limit 条
+        # 这里我们假设无论是运动还是饮食，只要是最近的都获取
+        recent_plans_query = Plan.objects.filter(user_id=user_id).order_by('-updated_at')[:limit]
+        
+        plans_list = list(
+            recent_plans_query.values(
+                "id", "title", "description", "start_time", "is_completed", "updated_at"
+            )
+        )
+        
+        # 格式化时间，并计算一个易于显示的相对时间
+        for plan in plans_list:
+            if plan.get('updated_at'):
+                # 这一步也可以在前端做，但后端做更方便
+                plan['display_date'] = timezone.localtime(plan['updated_at']).strftime('%Y-%m-%d %H:%M')
+        
+        return {
+            "code": 200,
+            "message": "最近计划获取成功。",
+            "data": {"recent_plans": plans_list}
+        }
+    except Exception as e:
+        return {"code": 500, "message": f"获取最近计划时发生错误: {e}", "data": None}

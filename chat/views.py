@@ -10,7 +10,7 @@ from rest_framework import status
 from openai.types.chat import ChatCompletionMessageParam
 
 from information.services import update_user_info, get_user_info
-from plan.services import create_or_update_plans, get_user_plans, delete_plan, delete_all_plans
+from plan.services import create_or_update_plans, get_user_plans, delete_plan, delete_all_plans,create_bulk_plans
 from core.types import ServiceResult
 from .services import client
 
@@ -21,7 +21,8 @@ AVAILABLE_TOOLS = {
     "create_or_update_plans": create_or_update_plans,
     "get_user_plans": get_user_plans,
     "delete_plan": delete_plan,
-     "delete_all_plans": delete_all_plans,
+    "delete_all_plans": delete_all_plans,
+    "create_bulk_plans": create_bulk_plans, 
 }
 
 # 编写所有工具的 JSON 定义
@@ -114,6 +115,34 @@ tools_definition = [
                 },
             }
         }
+    },
+     {
+        "type": "function",
+        "function": {
+            "name": "create_bulk_plans",
+            "description": "最高效的计划创建工具。当需要一次性为用户创建多个（例如一整周的）计划时，必须使用此工具。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "plans_data": {
+                        "type": "array",
+                        "description": "一个包含多个计划对象的JSON数组。每个对象都应包含title, day_of_week, start_time, end_time, 和可选的description。",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string"},
+                                "description": {"type": "string"},
+                                "day_of_week": {"type": "integer"},
+                                "start_time": {"type": "string", "pattern": "^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"},
+                                "end_time": {"type": "string", "pattern": "^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"}
+                            },
+                            "required": ["title", "day_of_week", "start_time", "end_time"]
+                        }
+                    }
+                },
+                "required": ["plans_data"]
+            }
+        }
     }
 ]
 
@@ -122,28 +151,24 @@ def rebuild_and_validate_messages(history: List[Dict[str, Any]], new_user_messag
     接收前端传来的历史记录和新消息，将其重构为 OpenAI API 能接受的干净格式。
     """
     # --- 这是最核心的修改：重写系统提示 ---
-    system_prompt = """你是一个积极主动、富有创意的顶级私人健康教练。
+    system_prompt = """你是一个积极主动、效率极高的顶级私人健康教练,能够主动提供健康计划和建议,包括饮食和运动,给出计划和建议的时候,要充分考虑用户的个人情况,在相关回复中体现出来你考虑的用户的情况,给出专业依据!!!
 
     **你的核心行为准则：**
-    1.  **主动性**: 当用户提出模糊的请求，尤其是第一次要求“制定计划”时，**你绝不能反问用户要细节**。你必须主动地、像一个专家一样，为用户生成一个全面、均衡的、为期一周的默认健康计划。
-    2.  **效率**: 在生成默认计划后，你必须使用**并行工具调用 (Parallel Tool Calling)**，在**一轮对话**中，一次性地请求创建所有计划（例如，周一到周日的运动和饮食）。
-    3.  **简洁性**: 在所有工具调用成功后，你只需向用户做一个简单的总结性回复，例如：“好的，我已经为您规划好了一整周的健康计划，您可以在计划页面查看详情。” **不要**逐条复述你创建的计划。
+    1.  **主动性**: 当用户提出模糊的请求，特别是第一次要求“制定计划”时，**你绝不能反问用户要细节**。你必须主动地、像一个专家一样，为用户生成一个全面、均衡的、为期一周的默认健康计划。
+    2.  **效率至上 (最重要！)**:
+        - 当你需要**创建多个计划**时（例如，在响应上述的模糊请求时），你**必须**使用 `create_bulk_plans` 工具。这个工具可以接收一个包含所有计划的数组，一次性完成任务。
+        - **绝对不要**通过多次调用 `create_or_update_plans` 来创建多个计划，那样的效率太低。
+        - 只有当用户明确要求**只修改或只添加一个**计划时，才使用 `create_or_update_plans`。
+    3.  **批量删除**: 同样，当用户要求“清空计划”时，优先使用 `delete_all_plans` 工具。
 
-    **【默认一周健康计划模板 (供你参考和发挥)】**
-    - **周一**: 早上 晨跑 (30分钟), 晚上 拉伸 (15分钟)
-    - **周二**: 晚上 力量训练 (60分钟)
-    - **周三**: 早上 瑜伽 (30分钟), 晚上 轻度有氧 (如快走)
-    - **周四**: 晚上 力量训练 (60分钟)
-    - **周五**: 早上 游泳 (45分钟)
-    - **周六**: 户外活动 (如登山或骑行)
-    - **周日**: 休息或主动恢复 (如散步)
-    - **饮食**: 每天规律三餐，并为每餐提供健康的、低脂高蛋白的食物建议作为 `description`。例如，早餐可以是“燕麦和水果”，午餐“鸡胸肉沙拉”，晚餐“鱼和蔬菜”。
+    **【主动规划工作流】**
+    当用户说“帮我制定一个计划”时，你的思考和行动步骤如下：
+    1.  在脑海中构思一个完整的一周计划（参考下面的模板）。
+    2.  将这个计划转换成一个 **JSON 数组**，数组中的每个元素都是一个符合 `create_bulk_plans` 工具 `items` 参数规范的对象。
+    3.  调用 `create_bulk_plans` 工具，并将这个完整的 JSON 数组作为 `plans_data` 参数的值。
+    4.  在工具调用成功后，给用户一个简洁的确认回复，例如：“好的，我已经为您规划好了一整周的健康计划，您可以在计划页面查看详情。”
 
-    **【具体指令】**
-    - 当用户说“帮我制定计划”、“给我一个计划”或类似的话时，立即启动上述的“主动规划”模式。
-    - 只有当用户提出**非常具体**的请求，比如“帮我加一个周五晚上的跑步计划”时，你才处理这一个具体的请求。
-
-    请严格遵循以上所有规则，展现出你作为一名顶级教练的专业性和主动性。"""
+    请严格遵循以上规则，始终选择最高效的工具来完成任务。"""
 
     rebuilt_messages: List[ChatCompletionMessageParam] = [{"role": "system", "content": system_prompt}]
 
@@ -194,7 +219,7 @@ def chat_view(request):
 
         for _ in range(MAX_TURNS):
             response = client.chat.completions.create(
-                model="gpt-4o-2024-08-06",
+                model="gpt-4o-mini",
                 messages=messages,
                 tools=cast(List[ChatCompletionToolParam], tools_definition),
                 tool_choice="auto",

@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from rest_framework import status
-
+from .services import get_recent_plans
 from .services import create_or_update_plans, get_user_plans
 from core.types import ServiceResult
 
@@ -68,3 +68,21 @@ def list_plans_view(request):
     # DRF 的 Response 会自动处理大部分情况，但我们也可以根据 code 明确设置
     http_status = status.HTTP_200_OK if response_data['code'] == 200 else status.HTTP_400_BAD_REQUEST
     return Response(response_data, status=http_status)
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def recent_plans_view(request):
+    """
+    获取用户最近的计划记录。
+    可以通过查询参数 ?limit=N 来指定获取的数量。
+    """
+    try:
+        limit_str = request.query_params.get('limit', '5') # 默认获取5条
+        limit = int(limit_str)
+    except (ValueError, TypeError):
+        limit = 5 # 如果参数无效，使用默认值
+
+    response_data = get_recent_plans(user_id=request.user.id, limit=limit)
+    
+    return Response(response_data, status=status.HTTP_200_OK if response_data['code'] == 200 else status.HTTP_400_BAD_REQUEST)

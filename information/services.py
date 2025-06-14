@@ -5,10 +5,10 @@ from django.core.exceptions import ObjectDoesNotExist
 from typing import Dict, Any, List, Optional
 from core.types import ServiceResult
 
-ALLOWED_FIELDS = {'height', 'weight', 'age', 'information', 'target'}
+ALLOWED_FIELDS = {'height', 'weight', 'age', 'target','information'}
 
 
-# --- 核心修改点 ---
+# --- 核心修正点 ---
 # 修改了函数签名，让它能接收任意关键字参数
 def update_user_info(user_id: int, **kwargs: Any) -> ServiceResult:
     """
