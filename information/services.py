@@ -17,8 +17,11 @@ def update_user_info(user_id: int, **kwargs: Any) -> ServiceResult:
     例如: update_user_info(user_id=1, height=180, weight=75)
     """
     # **kwargs 会是一个字典，比如 {'height': 180}，我们直接用它作为 updates
-    updates = kwargs
-    
+    if( 'updates' in kwargs):
+        updates = kwargs['updates']
+    else:
+        updates = kwargs
+
     if not isinstance(updates, dict) or not updates:
          return {"code": 300, "message": "没有提供任何需要更新的信息。", "data": None}
 

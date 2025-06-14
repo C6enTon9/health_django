@@ -191,8 +191,8 @@ def get_recent_plans(user_id: int, limit: int = 5) -> ServiceResult:
     try:
         # 按更新时间倒序排序，并取前 limit 条
         # 这里我们假设无论是运动还是饮食，只要是最近的都获取
-        recent_plans_query = Plan.objects.filter(user_id=user_id).order_by('-updated_at')[:limit]
-        
+        recent_plans_query = Plan.objects.filter(user_id=user_id, is_completed=True).order_by('-updated_at')[:limit]
+
         plans_list = list(
             recent_plans_query.values(
                 "id", "title", "description", "start_time", "is_completed", "updated_at"
@@ -212,3 +212,22 @@ def get_recent_plans(user_id: int, limit: int = 5) -> ServiceResult:
         }
     except Exception as e:
         return {"code": 500, "message": f"获取最近计划时发生错误: {e}", "data": None}
+    
+def get_over_number(user_id: int) -> ServiceResult:
+    """
+    获取用户最近完成或更新的N条计划。
+    """
+    try:
+        # 按更新时间倒序排序，并取前 limit 条
+        # 这里我们假设无论是运动还是饮食，只要是最近的都获取
+        recent_plans_query = Plan.objects.filter(user_id=user_id, is_completed=True)
+
+        res=recent_plans_query.count()
+
+        return {
+            "code": 200,
+            "message": "完成计划数量获取成功。",
+            "data": {"recent_plans_count": res}
+        }
+    except Exception as e:
+        return {"code": 500, "message": f"获取完成计划数量时发生错误: {e}", "data": None}

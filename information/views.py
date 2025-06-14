@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 
 
 @csrf_exempt
-@require_POST
+@api_view(['POST'])
 @authentication_classes([TokenAuthentication, SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def update_attribute_view(request, attribute_name: str):
@@ -31,9 +31,15 @@ def update_attribute_view(request, attribute_name: str):
 
     try:
         data = json.loads(request.body)
-        value = data.get(attribute_name)
-    except (json.JSONDecodeError, AttributeError):
-        response_data = {"code": 300, "message": "请求体格式错误或缺少必要数据", "data": None}
+        # [推荐修改] 始终从一个固定的 'value' 键中获取值
+        value = data.get('value')
+        
+        # 增加一个检查，确保 'value' 存在
+        if value is None:
+            raise AttributeError("'value' key not found in request body")
+
+    except (json.JSONDecodeError, AttributeError) as e:
+        response_data = {"code": 400, "message": f"请求体格式错误: {e}", "data": None}
         return JsonResponse(response_data, status=400)
 
     # 构建要传递给服务层的 updates 字典

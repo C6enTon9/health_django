@@ -6,7 +6,7 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.response import Response
 from rest_framework import status
 from .services import get_recent_plans
-from .services import create_or_update_plans, get_user_plans
+from .services import create_or_update_plans, get_user_plans, get_over_number
 from core.types import ServiceResult
 
 @api_view(['POST']) # 只允许 POST 请求
@@ -85,4 +85,14 @@ def recent_plans_view(request):
 
     response_data = get_recent_plans(user_id=request.user.id, limit=limit)
     
+    return Response(response_data, status=status.HTTP_200_OK if response_data['code'] == 200 else status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_over_num_view(request):
+
+
+    response_data = get_over_number(user_id=request.user.id)
+
     return Response(response_data, status=status.HTTP_200_OK if response_data['code'] == 200 else status.HTTP_400_BAD_REQUEST)
