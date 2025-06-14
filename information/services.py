@@ -2,16 +2,25 @@
 
 from .models import Information
 from django.core.exceptions import ObjectDoesNotExist
-from typing import Dict, Any, List, Optional # <- 导入 Optional
+from typing import Dict, Any, List, Optional
 from core.types import ServiceResult
 
 ALLOWED_FIELDS = {'height', 'weight', 'age', 'information', 'target'}
 
-def update_user_info(user_id: int, updates: Dict[str, Any]) -> ServiceResult:
-    """通用更新工具，通过 user_id 操作。"""
-    # ... 此函数无需修改，保持原样 ...
-    if not isinstance(updates, dict):
-         return {"code": 300, "message": "请求数据格式错误。", "data": None}
+
+# --- 核心修改点 ---
+# 修改了函数签名，让它能接收任意关键字参数
+def update_user_info(user_id: int, **kwargs: Any) -> ServiceResult:
+    """
+    通用更新工具，通过 user_id 操作。
+    现在它接受任意数量的关键字参数作为要更新的字段。
+    例如: update_user_info(user_id=1, height=180, weight=75)
+    """
+    # **kwargs 会是一个字典，比如 {'height': 180}，我们直接用它作为 updates
+    updates = kwargs
+    
+    if not isinstance(updates, dict) or not updates:
+         return {"code": 300, "message": "没有提供任何需要更新的信息。", "data": None}
 
     try:
         info_obj = Information.objects.get(user_id=user_id)
@@ -23,7 +32,7 @@ def update_user_info(user_id: int, updates: Dict[str, Any]) -> ServiceResult:
                 updated_fields.append(field)
 
         if not updated_fields:
-            return {"code": 300, "message": "没有提供任何允许更新的字段。", "data": None}
+            return {"code": 300, "message": "提供的字段均不被支持更新。", "data": None}
 
         info_obj.save(update_fields=updated_fields)
         
@@ -37,7 +46,7 @@ def update_user_info(user_id: int, updates: Dict[str, Any]) -> ServiceResult:
         return {"code": 500, "message": "服务器内部错误", "data": None}
 
 
-# --- FIX: 修改了函数签名，使 attributes 成为可选参数 ---
+# get_user_info 函数保持不变
 def get_user_info(user_id: int, attributes: Optional[List[str]] = None) -> ServiceResult:
     """
     通用查询工具，通过 user_id 操作。
@@ -46,7 +55,6 @@ def get_user_info(user_id: int, attributes: Optional[List[str]] = None) -> Servi
     try:
         info_obj = Information.objects.get(user_id=user_id)
         
-        # 如果AI没有指定attributes，或者列表为空，我们就返回所有允许的字段
         if not attributes:
             attributes_to_fetch = list(ALLOWED_FIELDS)
         else:

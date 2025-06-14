@@ -1,42 +1,46 @@
-# chat/views.py
-
 import json
-import os
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.decorators import login_required
 from openai import OpenAI
-from typing import cast, List, Dict, Any
+from typing import cast, List, Dict, Any, Optional
 
-# --- 1. 使用正确的绝对导入 ---
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.response import Response
+from rest_framework import status
+from openai.types.chat import ChatCompletionMessageParam
+
 from information.services import update_user_info, get_user_info
-from plan.services import create_or_update_plans, get_user_plans
+from plan.services import create_or_update_plans, get_user_plans, delete_plan
 from core.types import ServiceResult
-
 from .services import client
 
-# --- 3. 将所有 AI 可用工具放入一个字典，方便查找 ---
+# 将所有 AI 可用工具放入一个字典
 AVAILABLE_TOOLS = {
     "update_user_info": update_user_info,
     "get_user_info": get_user_info,
     "create_or_update_plans": create_or_update_plans,
     "get_user_plans": get_user_plans,
+    "delete_plan": delete_plan,
 }
 
-# --- 4. 编写所有工具的 JSON 定义，告诉 AI 如何使用它们 ---
-# (这部分无需修改，保持原样)
+# 编写所有工具的 JSON 定义
 tools_definition = [
     # Information Tools
     {
         "type": "function",
         "function": {
             "name": "update_user_info",
-            "description": "更新用户的一项或多项个人信息，如身高、体重、年龄、个人简介或目标。",
+            "description": "更新用户的一项或多项个人信息。例如，当用户说'我的身高是180cm'或'我的目标是减肥'时，调用此函数。",
             "parameters": {
                 "type": "object",
-                "properties": {"updates": {"type": "object", "description": "一个包含要更新的字段和新值的字典。例如：{'weight': 75.5}"}},
-                "required": ["updates"]
+                "properties": {
+                    "height": {"type": "number", "description": "用户新的身高(单位:cm)"},
+                    "weight": {"type": "number", "description": "用户新的体重(单位:kg)"},
+                    "age": {"type": "integer", "description": "用户新的年龄"},
+                    "information": {"type": "string", "description": "用户新的个人简介"},
+                    "target": {"type": "string", "description": "用户新的健康目标"}
+                },
+                "required": []
             }
         }
     },
@@ -47,7 +51,7 @@ tools_definition = [
             "description": "查询用户的一项或多项个人信息。如果不指定，则返回全部信息。",
             "parameters": {
                 "type": "object",
-                "properties": {"attributes": {"type": "array", "description": "要查询的字段名称列表。例如：['weight', 'height']", "items": {"type": "string"}}},
+                "properties": {"attributes": {"type": "array", "description": "要查询的字段名称列表。", "items": {"type": "string"}}},
             }
         }
     },
@@ -56,24 +60,18 @@ tools_definition = [
         "type": "function",
         "function": {
             "name": "create_or_update_plans",
-            "description": "为用户创建或更新一个或多个周常计划。必须在获取了用户的个人信息和现有计划后才能调用此工具。",
+            "description": "为用户创建或更新一个周常计划，可以是运动或饮食。必须提供描述。",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "plans_data": {
-                        "type": "array", "description": "一个计划列表，每个计划都是一个包含详细信息的字典。",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "id": {"type": "integer", "description": "计划ID，仅在更新时提供。"},
-                                "title": {"type": "string", "description": "计划标题，如'晨跑'。"},
-                                "day_of_week": {"type": "integer", "description": "星期几(1-7)。"},
-                                "start_time": {"type": "string", "description": "开始时间，格式'HH:MM'。"},
-                                "end_time": {"type": "string", "description": "结束时间，格式'HH:MM'。"}
-                            }, "required": ["title", "day_of_week", "start_time", "end_time"]
-                        }
-                    }
-                }, "required": ["plans_data"]
+                    "title": {"type": "string", "description": "计划标题。运动是'跑步'，饮食是'早餐'等。"},
+                    "description": {"type": "string", "description": "详细描述。饮食必须包含食物，运动可描述地点强度。"},
+                    "day_of_week": {"type": "integer", "description": "星期几(1-7)。"},
+                    "start_time": {"type": "string", "description": "开始时间 'HH:MM'。"},
+                    "end_time": {"type": "string", "description": "结束时间 'HH:MM'。"},
+                    "id": {"type": "integer", "description": "仅在更新时提供ID。"},
+                },
+                "required": ["title", "day_of_week", "start_time", "end_time", "description"]
             }
         }
     },
@@ -81,54 +79,100 @@ tools_definition = [
         "type": "function",
         "function": {
             "name": "get_user_plans",
-            "description": "查询用户的周常计划。当用户想知道'我有什么计划'时使用。",
+            "description": "查询用户的全部周常计划，包括运动和饮食。",
             "parameters": {
                 "type": "object",
-                "properties": {"day_of_week": {"type": "integer", "description": "要查询的星期(1-7)。如果省略，则查询所有计划。"}},
+                "properties": {"day_of_week": {"type": "integer", "description": "要查询的星期(1-7)。"}},
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_plan",
+            "description": "删除一个已存在的周常计划。当用户明确表示要'删除'或'取消'某个计划时使用。",
+            "parameters": {
+                "type": "object",
+                "properties": {"plan_id": {"type": "integer", "description": "要删除的计划的唯一ID。必须先通过 get_user_plans 获取。"}},
+                "required": ["plan_id"]
             }
         }
     }
 ]
 
-@csrf_exempt
-# @login_required # 在实际生产中，请务必开启登录验证！
-@require_POST
+def rebuild_and_validate_messages(history: List[Dict[str, Any]], new_user_message: str) -> Optional[List[ChatCompletionMessageParam]]:
+    """
+    接收前端传来的历史记录和新消息，将其重构为 OpenAI API 能接受的干净格式。
+    """
+    system_prompt = """你是一个能干、简洁的个人健康助理。
+
+        **你的核心任务是调用工具来管理用户的健康计划，并用自然语言进行回复。**
+
+        **【行为准则】**
+
+        **1. 关于工具调用:**
+           - 你可以创建、更新、查询、删除用户的运动和饮食计划。
+           - **创建/更新计划时 (`create_or_update_plans`)，必须提供 `description` 字段。**
+           - **删除计划时 (`delete_plan`)，必须先通过 `get_user_plans` 获取 `plan_id` 并与用户确认。**
+
+        **2. 关于回复用户 (最重要！):**
+           - 当你调用**创建、更新或删除**计划的工具 (`create_or_update_plans`, `delete_plan`) 并从工具那里收到了一个表示**成功**的 JSON 结果 (例如 `{"code": 200, ...}`) 后：
+             - **你绝对不准将这个 JSON 结果的任何部分（如 'code', 'data', 'id'）直接展示或复述给用户。**
+             - 你**必须**根据操作的类型，生成一句**全新的、自然的、总结性的确认话语**。
+
+           - **回复范例 (必须严格遵守):**
+             - **创建成功后**: 不要说 "已创建，ID是103"，而是说 "好的，我已经为您安排好了周一的晨跑计划。" 或者 "没问题，您的早餐计划已经添加。"
+             - **更新成功后**: 不要说 "更新成功，updated: 1"，而是说 "好的，我已经将您的计划更新为晚上8点健身。"
+             - **删除成功后**: 不要说 "已删除，deleted: 1"，而是说 "好的，我已经帮您取消了那个计划。"
+
+           - **只有在调用查询工具 (`get_user_plans`) 时**，你才需要将查询到的计划内容（标题、时间等）以清晰的列表形式展示给用户，以便他们进行后续操作。
+
+        请严格遵循以上所有规则，尤其是关于**如何回复用户**的规则。"""
+
+    rebuilt_messages: List[ChatCompletionMessageParam] = [{"role": "system", "content": system_prompt}]
+
+    for msg in history:
+        if not isinstance(msg, dict) or "role" not in msg:
+            continue
+        role = msg.get("role")
+        try:
+            if role == 'user':
+                if msg.get("content"): rebuilt_messages.append({"role": "user", "content": str(msg["content"])})
+            elif role == 'assistant':
+                assistant_msg: Dict[str, Any] = {"role": "assistant"}
+                content = msg.get("content")
+                tool_calls = msg.get("tool_calls")
+                if content is not None: assistant_msg["content"] = str(content)
+                if tool_calls: assistant_msg["tool_calls"] = tool_calls
+                if "content" in assistant_msg or "tool_calls" in assistant_msg: rebuilt_messages.append(cast(ChatCompletionMessageParam, assistant_msg))
+            elif role == 'tool':
+                if "tool_call_id" in msg and "name" in msg and "content" in msg:
+                    rebuilt_messages.append({"role": "tool", "tool_call_id": msg["tool_call_id"], "name": msg["name"], "content": str(msg["content"])})
+        except (KeyError, TypeError):
+            continue
+    rebuilt_messages.append({"role": "user", "content": new_user_message})
+    return rebuilt_messages
+
+
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
 def chat_view(request):
     """
-    处理与 AI 的对话请求。
-    此视图现在支持多步工具调用，允许 AI 在一个任务中按顺序调用多个函数。
+    处理与 AI 的对话请求，支持并行工具调用。
     """
     try:
-        data = json.loads(request.body)
-        user_message = data.get('message')
-        # 新增：接收前端传递的完整对话历史
-        history = data.get('history', [])
-        
+        user_message = request.data.get('message')
+        history = request.data.get('history', [])
         if not user_message:
-            return JsonResponse({"code": 300, "message": "message 字段不能为空", "data": None}, status=400)
-    except json.JSONDecodeError:
-        return JsonResponse({"code": 300, "message": "无效的JSON格式", "data": None}, status=400)
-    
-    # --- 核心改动：将会话历史和新消息结合 ---
-    messages = [
-        {"role": "system", "content": """你是一个能干的个人健康助理，可以帮助用户管理个人信息和周常计划。
+            return Response({"code": 300, "message": "message 字段不能为空", "data": None}, status=status.HTTP_400_BAD_REQUEST)
+        messages = rebuild_and_validate_messages(history, user_message)
+        if messages is None:
+            return Response({"code": 400, "message": "历史记录格式无法处理", "data": None}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"code": 400, "message": f"请求体解析或消息重构时出错: {e}", "data": None}, status=status.HTTP_400_BAD_REQUEST)
 
-当用户要求生成或修改健康计划时，你必须严格遵循以下步骤：
-1. **第一步**: 调用 `get_user_info` 获取用户的个人信息（如身高、体重、目标等）以获得全面的背景。
-2. **第二步**: 调用 `get_user_plans` 获取用户现有的计划，以避免冲突或重复。
-3. **第三步**: 在获得了上述所有信息后，结合用户的原始请求，生成一个经过深思熟虑的、完整的计划。
-4. **第四步**: 调用 `create_or_update_plans` 来保存这个新计划。
-5. **最后**: 在所有工具调用成功后，向用户总结你所做的操作，例如：“我已经根据您的信息为您制定了新的跑步计划。”
-
-在其他情况下，请根据用户的指令，智能地选择并调用最合适的单个工具来完成任务。"""},
-    ]
-    # 将前端的历史记录加入，使其成为真正的多轮对话
-    messages.extend(history)
-    messages.append({"role": "user", "content": user_message})
-
-    # --- 核心改动：引入循环来处理多步工具调用 ---
-    MAX_TURNS = 5  # 设置最大循环次数，防止无限循环
-    
+    MAX_TURNS = 5
     try:
         from openai.types.chat import ChatCompletionToolParam
 
@@ -139,58 +183,47 @@ def chat_view(request):
                 tools=cast(List[ChatCompletionToolParam], tools_definition),
                 tool_choice="auto",
             )
-            response_message = response.choices[0].message
+            response_message_dict = response.choices[0].message.model_dump()
+            messages.append(response_message_dict)
             
-            # 将AI的回复（可能是带工具调用的回复）也加入消息历史
-            messages.append(response_message.model_dump())
-            
-            # --- 步骤 1: 检查AI是否决定调用工具 ---
-            if not response_message.tool_calls:
-                # 如果没有工具调用，说明AI认为任务已完成，直接返回其最终答复
-                # 注意：在我们的流程中，如果成功创建计划，AI也应该给个总结性回复
-                response_data = {"code": 200, "message": "获取成功", "data": {"reply": response_message.content, "history": messages}}
-                return JsonResponse(response_data, status=200)
+            if not response_message_dict.get("tool_calls"):
+                final_reply = response_message_dict.get("content")
+                response_data = {"code": 200, "message": "获取成功", "data": {"reply": final_reply, "history": messages}}
+                return Response(response_data, status=status.HTTP_200_OK)
 
-            # --- 步骤 2: 执行AI请求的工具 ---
-            # 如果AI决定调用工具，我们在这里处理
-            for tool_call in response_message.tool_calls:
-                function_name = tool_call.function.name
+            tool_outputs = []
+            for tool_call in response_message_dict["tool_calls"]:
+                function_name = tool_call.get("function", {}).get("name")
                 tool_function = AVAILABLE_TOOLS.get(function_name)
 
                 if not tool_function:
-                    error_message = f"错误：AI试图调用未知工具'{function_name}'"
-                    return JsonResponse({"code": 400, "message": error_message, "data": None}, status=400)
+                    return Response({"code": 400, "message": f"错误：AI试图调用未知工具'{function_name}'", "data": None}, status=status.HTTP_400_BAD_REQUEST)
 
-                # 准备并执行函数
-                function_args = json.loads(tool_call.function.arguments)
-                # !! 确保 user_id 在每次调用时都传递进去 !!
-                # user_id = request.user.id if request.user.is_authenticated else 1 # 临时用1做测试
-                function_args['user_id'] = 1
+                try:
+                    function_args_str = tool_call.get("function", {}).get("arguments", "{}")
+                    function_args = json.loads(function_args_str)
+                except json.JSONDecodeError:
+                     return Response({"code": 500, "message": "AI内部错误：生成的工具参数格式不正确"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+                function_args['user_id'] = request.user.id
+                
                 result_from_tool: ServiceResult = tool_function(**function_args)
                 
-                # --- 重要：检查工具执行结果 ---
-                # 如果任何一个工具调用失败，应立即中止并返回错误
-                if result_from_tool['code'] != 200:
-                    error_detail = result_from_tool.get('message', '工具执行失败')
-                    response_data = {"code": 400, "message": f"工具 '{function_name}' 执行失败: {error_detail}", "data": result_from_tool}
-                    return JsonResponse(response_data, status=400)
+                if result_from_tool['code'] not in [200, 201]:
+                    return Response(result_from_tool, status=status.HTTP_400_BAD_REQUEST)
 
-                # --- 步骤 3: 将工具执行结果追加到消息历史中 ---
-                # 这是让AI知道上一步结果的关键
-                messages.append({
-                    "tool_call_id": tool_call.id,
+                tool_outputs.append({
+                    "tool_call_id": tool_call.get("id"),
                     "role": "tool",
                     "name": function_name,
-                    "content": json.dumps(result_from_tool) # 将整个 ServiceResult 作为内容返回给AI
+                    "content": json.dumps(result_from_tool, ensure_ascii=False)
                 })
 
-            # 循环继续，将带有工具结果的新 `messages` 列表再次发送给AI
-            # AI会看到上一步的结果，然后决定下一步做什么（调用另一个工具或最终回复）
+            messages.extend(tool_outputs)
 
-        # 如果循环了 MAX_TURNS 次还没结束，则强制退出并报错
-        return JsonResponse({"code": 500, "message": "处理超时，AI交互超过最大轮次限制", "data": None}, status=500)
+        return Response({"code": 500, "message": "处理超时，AI交互超过最大轮次限制", "data": None}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     except Exception as e:
-        print(f"调用AI或工具时发生错误: {e}")
-        return JsonResponse({"code": 500, "message": f"与AI服务通信时发生错误: {str(e)}", "data": None}, status=500)
+        import traceback
+        traceback.print_exc()
+        return Response({"code": 500, "message": f"与AI服务通信时发生严重错误: {str(e)}", "data": None}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
