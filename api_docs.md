@@ -13,7 +13,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID",
+    "username": "用户ID",
     "password": "密码"
 }
 ```
@@ -24,7 +24,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID",
+    "username": "用户ID",
     "password": "密码"
 }
 ```
@@ -37,7 +37,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID",
+    "username": "用户ID",
     "height": "身高（单位：cm）"
 }
 ```
@@ -58,7 +58,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID"
+    "username": "用户ID"
 }
 ```
 
@@ -68,7 +68,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID",
+    "username": "用户ID",
     "weight": "体重（单位：kg）"
 }
 ```
@@ -79,7 +79,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID"
+    "username": "用户ID"
 }
 ```
 
@@ -89,7 +89,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID",
+    "username": "用户ID",
     "age": "年龄"
 }
 ```
@@ -100,7 +100,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID"
+    "username": "用户ID"
 }
 ```
 
@@ -110,7 +110,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID",
+    "username": "用户ID",
     "information": "用户信息"
 }
 ```
@@ -121,7 +121,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID"
+    "username": "用户ID"
 }
 ```
 
@@ -131,7 +131,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID",
+    "username": "用户ID",
     "target": "用户目标"
 }
 ```
@@ -142,7 +142,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID"
+    "username": "用户ID"
 }
 ```
 
@@ -154,7 +154,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID"
+    "username": "用户ID"
 }
 ```
 
@@ -164,7 +164,7 @@
 - **请求体格式**：
 ```json
 {
-    "user_id": "用户ID",
+    "username": "用户ID",
     "new_info": "新的信息"//没有新信息则为空
 }
 ```

@@ -1,63 +1,69 @@
-from django.shortcuts import render
+# plan/views.py
+
 import json
-from .models import Plan
-from information.models import Information
-from information.views import get_all_information
 from django.http import JsonResponse
-from ai.deepseek import chat
-from ai.response2plan import parse_plans
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+
+from .services import create_or_update_plans, get_user_plans
+from core.types import ServiceResult
+
+@csrf_exempt
+
+@require_http_methods(["POST"]) # 这个视图只接受 POST 请求
+def manage_plans_view(request):
+    """
+    一个统一的视图，用于创建或更新一个或多个计划。
+    前端需要发送一个包含 'plans_data' 列表的 JSON 请求体。
+    """
+    response_data: ServiceResult
+
+    try:
+        data = json.loads(request.body)
+        plans_data = data.get('plans_data') # 从请求体中获取计划数据列表
+
+        if plans_data is None:
+            response_data = {"code": 300, "message": "请求体中缺少 'plans_data' 字段。", "data": None}
+            return JsonResponse(response_data, status=400)
+
+        # 调用服务层函数处理所有逻辑
+        response_data = create_or_update_plans(username=request.user.id, plans_data=plans_data)
+
+    except json.JSONDecodeError:
+        response_data = {"code": 300, "message": "无效的JSON格式", "data": None}
+        return JsonResponse(response_data, status=400)
+    
+    http_status = 200 if response_data['code'] == 200 else 400
+    return JsonResponse(response_data, status=http_status)
 
 
-def get_plan(request):
-    # 获取数据
-    data = json.loads(request.body)
-    user_id = data.get("user_id")
-    # 验证数据
-    if user_id is None:
-        return JsonResponse({"code": 300, "message": "缺少必要参数"})
-    # 业务逻辑
-    plans = Plan.objects.filter(user_id=user_id)
-    if not plans:
-        return JsonResponse({"code": 400, "message": "用户不存在"})
-    return JsonResponse(
-        {"code": 200, "message": "获取计划成功", "data": plans.values()}
-    )
+@csrf_exempt
 
+@require_http_methods(["GET"]) # 这个视图只接受 GET 请求，更符合 RESTful 风格
+def list_plans_view(request):
+    """
+    一个统一的视图，用于获取用户的计划。
+    可以通过 URL 查询参数来筛选星期，例如: /api/plan/list/?day=1
+    """
+    response_data: ServiceResult
 
-def upd_plan(request):
-    # 获取数据
-    data = json.loads(request.body)
-    user_id = data.get("user_id")
-    new_info = data.get("new_info")
-    if new_info is None:
-        new_info = ""
-    # 检验数据
-    if not user_id or not new_info:
-        return JsonResponse({"code": 300, "message": "用户ID或新信息缺失"})
-    # 业务逻辑
-    information = Information.objects.get(user_id=user_id)
-    if not information:
-        return JsonResponse({"code": 400, "message": "用户不存在"})
-    information.information = information.information + new_info
-    information.save()
-    message = get_all_information(user_id)
-    make_plan(user_id, message)
-    return JsonResponse({"code": 200, "message": "更新计划成功"})
+    # 从 URL 查询参数中获取 day_of_week
+    day_of_week_str = request.GET.get('day')
+    day_of_week = None
+    
+    if day_of_week_str:
+        try:
+            day_of_week = int(day_of_week_str)
+            if not 1 <= day_of_week <= 7:
+                 response_data = {"code": 300, "message": "参数 'day' 必须是 1 到 7 之间的整数。", "data": None}
+                 return JsonResponse(response_data, status=400)
+        except (ValueError, TypeError):
+            response_data = {"code": 300, "message": "参数 'day' 必须是一个整数。", "data": None}
+            return JsonResponse(response_data, status=400)
 
-
-def make_plan(user_id, information):
-    plans = chat(user_id, information)
-    plans = parse_plans(plans)
-    # 将解析后的计划保存到数据库
-    for plan in plans:
-        plan_instance = Plan(
-            user_id=user_id,
-            thing=plan.thing,
-            description=plan.description,
-            day=plan.day,
-            start_time=plan.start_time,
-            end_time=plan.end_time,
-            is_completed=False,
-        )
-        plan_instance.save()
-    return JsonResponse({"code": 200, "message": "计划生成成功", "data": plans})
+    # 调用服务层函数
+    response_data = get_user_plans(username=request.user.id, day_of_week=day_of_week)
+    
+    http_status = 200 if response_data['code'] == 200 else 400
+    return JsonResponse(response_data, status=http_status)

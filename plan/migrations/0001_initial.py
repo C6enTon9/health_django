@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             name='Plan',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('user_id', models.CharField(max_length=20)),
+                ('username', models.CharField(max_length=20)),
                 ('thing', models.CharField(max_length=100)),
                 ('description', models.TextField()),
                 ('day', models.IntegerField()),

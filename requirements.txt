@@ -23,3 +23,8 @@ typing-inspection==0.4.0
 typing_extensions==4.13.1
 tzdata==2025.2
 urllib3==2.3.0
+django-stubs
+djangorestframework-stubs
+django-cors-headers==4.3.1
+drf-yasg==1.21.7  # 用于 API 文档
+gunicorn==21.2.0  # 生产环境 WSGI 服务器
