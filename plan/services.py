@@ -231,3 +231,21 @@ def get_over_number(user_id: int) -> ServiceResult:
         }
     except Exception as e:
         return {"code": 500, "message": f"获取完成计划数量时发生错误: {e}", "data": None}
+    
+def get_workout(user_id: int) -> ServiceResult:
+    res = []
+    try:
+        # 按更新时间倒序排序，并取前 limit 条
+        # 这里我们假设无论是运动还是饮食，只要是最近的都获取
+        for i in range(1, 8):
+            recent_plans_query = Plan.objects.filter(user_id=user_id, day_of_week=i, is_completed=True)
+            res.append(recent_plans_query.count())
+        print(res)
+        return {
+            "code": 200,
+            "message": "完成计划数量获取成功。",
+            "data": {"recent_plans_count": res}
+        }
+    except Exception as e:
+        return {"code": 500, "message": f"获取完成计划数量时发生错误: {e}", "data": None}
+    

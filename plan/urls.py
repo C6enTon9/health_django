@@ -13,4 +13,5 @@ urlpatterns = [
     path('list/', views.list_plans_view, name='list_plans'),
     path('recent/', views.recent_plans_view, name='recent_plans'),
     path('over/', views.get_over_num_view, name='get_over_num'),
+    path('workout/', views.get_workout_view, name='get_workout'),
 ]
