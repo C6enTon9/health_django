@@ -5,7 +5,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from typing import Dict, Any, List, Optional
 from core.types import ServiceResult
 
-ALLOWED_FIELDS = {'height', 'weight', 'age', 'target','information'}
+ALLOWED_FIELDS = {'height', 'weight', 'age', 'target', 'information', 'gender'}
 
 
 # --- 核心修正点 ---
@@ -77,4 +77,31 @@ def get_user_info(user_id: int, attributes: Optional[List[str]] = None) -> Servi
         return {"code": 400, "message": "用户的信息记录不存在", "data": None}
     except Exception as e:
         print(f"获取用户信息时发生错误: {e}")
+        return {"code": 500, "message": "服务器内部错误", "data": None}
+
+
+def get_health_metrics(user_id: int) -> ServiceResult:
+    """
+    获取用户的健康指标，包括BMI、BMR和每日推荐热量
+    """
+    try:
+        info_obj = Information.objects.get(user_id=user_id)
+
+        metrics_data = {
+            'bmi': info_obj.bmi,
+            'bmi_category': info_obj.bmi_category,
+            'bmr': info_obj.bmr,
+            'daily_calories': info_obj.daily_calories,
+            'height': info_obj.height,
+            'weight': info_obj.weight,
+            'age': info_obj.age,
+            'gender': info_obj.gender,
+        }
+
+        return {"code": 200, "message": "健康指标获取成功", "data": metrics_data}
+
+    except ObjectDoesNotExist:
+        return {"code": 400, "message": "用户的信息记录不存在", "data": None}
+    except Exception as e:
+        print(f"获取健康指标时发生错误: {e}")
         return {"code": 500, "message": "服务器内部错误", "data": None}

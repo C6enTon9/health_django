@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 
-from .services import update_user_info, get_user_info, ALLOWED_FIELDS
+from .services import update_user_info, get_user_info, get_health_metrics, ALLOWED_FIELDS
 from core.types import ServiceResult
 
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -73,5 +73,18 @@ def get_attribute_view(request, attribute_name: str):
     
     # 调用服务层
     response_data = get_user_info(user_id=request.user.id, attributes=attributes)
+    http_status = 200 if response_data['code'] == 200 else 400
+    return JsonResponse(response_data, status=http_status)
+
+
+@csrf_exempt
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_health_metrics_view(request):
+    """
+    获取用户的健康指标（BMI、BMR、每日推荐热量等）
+    """
+    response_data = get_health_metrics(user_id=request.user.id)
     http_status = 200 if response_data['code'] == 200 else 400
     return JsonResponse(response_data, status=http_status)

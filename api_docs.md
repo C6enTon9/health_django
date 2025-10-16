@@ -146,6 +146,84 @@
 }
 ```
 
+### 11. 更新性别
+
+- **接口地址**：`/api/information/update/gender/`
+- **请求方法**：POST
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
+- **请求体格式**：
+```json
+{
+    "value": "male"  // 或 "female"
+}
+```
+- **响应示例**：
+```json
+{
+    "code": 200,
+    "message": "信息更新成功",
+    "data": {
+        "gender": "male"
+    }
+}
+```
+
+### 12. 获取性别
+
+- **接口地址**：`/api/information/get/gender/`
+- **请求方法**：GET
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
+- **响应示例**：
+```json
+{
+    "code": 200,
+    "message": "信息获取成功",
+    "data": {
+        "gender": "male"
+    }
+}
+```
+
+### 13. 获取健康指标（BMI、基础代谢率、每日推荐热量）
+
+- **接口地址**：`/api/information/health-metrics/`
+- **请求方法**：GET
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
+- **响应示例**：
+```json
+{
+    "code": 200,
+    "message": "健康指标获取成功",
+    "data": {
+        "bmi": 22.86,
+        "bmi_category": "正常",
+        "bmr": 1543.75,
+        "daily_calories": 1852.5,
+        "height": 170.0,
+        "weight": 66.0,
+        "age": 25,
+        "gender": "male"
+    }
+}
+```
+- **说明**：
+  - `bmi`: 身体质量指数，公式：体重(kg) / 身高(m)²
+  - `bmi_category`: BMI分类（偏瘦/正常/偏胖/肥胖）
+  - `bmr`: 基础代谢率(卡路里/天)，使用Mifflin-St Jeor公式计算
+  - `daily_calories`: 每日推荐热量摄入(卡路里/天)，基于久坐活动水平(系数1.2)
+
 ## PLAN API
 
 ### 1. 获取计划

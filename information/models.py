@@ -26,8 +26,71 @@ class Information(models.Model):
     )
 
     age = models.IntegerField(default=21, verbose_name="年龄")
+
+    # 新增：性别字段（用于计算基础代谢）
+    GENDER_CHOICES = [
+        ('male', '男'),
+        ('female', '女'),
+    ]
+    gender = models.CharField(
+        max_length=10,
+        choices=GENDER_CHOICES,
+        default='male',
+        verbose_name="性别"
+    )
+
     target = models.TextField(blank=True, verbose_name="目标")
     Information = models.TextField(blank=True, verbose_name="个人简介")
+
+    # --- 计算属性方法 ---
+
+    @property
+    def bmi(self) -> float:
+        """
+        计算BMI（身体质量指数）
+        公式：BMI = 体重(kg) / (身高(m))²
+        """
+        if self.height > 0:
+            height_in_meters = self.height / 100
+            return round(self.weight / (height_in_meters ** 2), 2)
+        return 0.0
+
+    @property
+    def bmi_category(self) -> str:
+        """
+        根据BMI值返回健康状况分类
+        """
+        bmi_value = self.bmi
+        if bmi_value < 18.5:
+            return "偏瘦"
+        elif 18.5 <= bmi_value < 24:
+            return "正常"
+        elif 24 <= bmi_value < 28:
+            return "偏胖"
+        else:
+            return "肥胖"
+
+    @property
+    def bmr(self) -> float:
+        """
+        计算基础代谢率（BMR）- 使用Mifflin-St Jeor公式
+        男性：BMR = 10 × 体重(kg) + 6.25 × 身高(cm) - 5 × 年龄 + 5
+        女性：BMR = 10 × 体重(kg) + 6.25 × 身高(cm) - 5 × 年龄 - 161
+        """
+        bmr_value = 10 * self.weight + 6.25 * self.height - 5 * self.age
+        if self.gender == 'male':
+            bmr_value += 5
+        else:
+            bmr_value -= 161
+        return round(bmr_value, 2)
+
+    @property
+    def daily_calories(self) -> float:
+        """
+        计算每日推荐热量摄入
+        使用默认活动水平系数 1.2（久坐）
+        """
+        return round(self.bmr * 1.2, 2)
 
     # --- 添加模型元数据，提升可用性 ---
 
