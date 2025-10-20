@@ -42,6 +42,14 @@ class Information(models.Model):
     target = models.TextField(blank=True, verbose_name="目标")
     Information = models.TextField(blank=True, verbose_name="个人简介")
 
+    # 用户自定义的每日目标热量（如果为None则使用计算值）
+    target_calories = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name="每日目标热量(kcal)",
+        help_text="用户自定义的每日目标热量，如果未设置则使用系统计算值"
+    )
+
     # --- 计算属性方法 ---
 
     @property
@@ -87,9 +95,12 @@ class Information(models.Model):
     @property
     def daily_calories(self) -> float:
         """
-        计算每日推荐热量摄入
+        获取每日推荐热量摄入
+        优先返回用户自定义的目标热量，如果未设置则使用系统计算值
         使用默认活动水平系数 1.2（久坐）
         """
+        if self.target_calories is not None:
+            return round(self.target_calories, 2)
         return round(self.bmr * 1.2, 2)
 
     # --- 添加模型元数据，提升可用性 ---

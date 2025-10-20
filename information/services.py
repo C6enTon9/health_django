@@ -5,7 +5,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from typing import Dict, Any, List, Optional
 from core.types import ServiceResult
 
-ALLOWED_FIELDS = {'height', 'weight', 'age', 'target', 'information', 'gender'}
+ALLOWED_FIELDS = {'height', 'weight', 'age', 'target', 'information', 'gender', 'target_calories'}
 
 
 # --- 核心修正点 ---

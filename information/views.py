@@ -88,3 +88,201 @@ def get_health_metrics_view(request):
     response_data = get_health_metrics(user_id=request.user.id)
     http_status = 200 if response_data['code'] == 200 else 400
     return JsonResponse(response_data, status=http_status)
+
+
+# ==================== 旧版兼容接口 ====================
+# 这些接口保持向后兼容，使用旧的请求体格式（包含username字段）
+
+@csrf_exempt
+@require_POST
+def upd_height_view(request):
+    """旧版接口: 更新身高"""
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+        height = data.get('height')
+
+        from user.models import User
+        user = User.objects.get(username=username)
+        response_data = update_user_info(user_id=user.id, height=height)
+    except User.DoesNotExist:
+        response_data = {"code": 400, "message": "用户不存在", "data": None}
+    except Exception as e:
+        response_data = {"code": 400, "message": str(e), "data": None}
+
+    return JsonResponse(response_data)
+
+
+@csrf_exempt
+@require_POST
+def get_height_view(request):
+    """旧版接口: 获取身高"""
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+
+        from user.models import User
+        user = User.objects.get(username=username)
+        response_data = get_user_info(user_id=user.id, attributes=['height'])
+    except User.DoesNotExist:
+        response_data = {"code": 400, "message": "用户不存在", "data": None}
+    except Exception as e:
+        response_data = {"code": 400, "message": str(e), "data": None}
+
+    return JsonResponse(response_data)
+
+
+@csrf_exempt
+@require_POST
+def upd_weight_view(request):
+    """旧版接口: 更新体重"""
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+        weight = data.get('weight')
+
+        from user.models import User
+        user = User.objects.get(username=username)
+        response_data = update_user_info(user_id=user.id, weight=weight)
+    except User.DoesNotExist:
+        response_data = {"code": 400, "message": "用户不存在", "data": None}
+    except Exception as e:
+        response_data = {"code": 400, "message": str(e), "data": None}
+
+    return JsonResponse(response_data)
+
+
+@csrf_exempt
+@require_POST
+def get_weight_view(request):
+    """旧版接口: 获取体重"""
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+
+        from user.models import User
+        user = User.objects.get(username=username)
+        response_data = get_user_info(user_id=user.id, attributes=['weight'])
+    except User.DoesNotExist:
+        response_data = {"code": 400, "message": "用户不存在", "data": None}
+    except Exception as e:
+        response_data = {"code": 400, "message": str(e), "data": None}
+
+    return JsonResponse(response_data)
+
+
+@csrf_exempt
+@require_POST
+def upd_age_view(request):
+    """旧版接口: 更新年龄"""
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+        age = data.get('age')
+
+        from user.models import User
+        user = User.objects.get(username=username)
+        response_data = update_user_info(user_id=user.id, age=age)
+    except User.DoesNotExist:
+        response_data = {"code": 400, "message": "用户不存在", "data": None}
+    except Exception as e:
+        response_data = {"code": 400, "message": str(e), "data": None}
+
+    return JsonResponse(response_data)
+
+
+@csrf_exempt
+@require_POST
+def get_age_view(request):
+    """旧版接口: 获取年龄"""
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+
+        from user.models import User
+        user = User.objects.get(username=username)
+        response_data = get_user_info(user_id=user.id, attributes=['age'])
+    except User.DoesNotExist:
+        response_data = {"code": 400, "message": "用户不存在", "data": None}
+    except Exception as e:
+        response_data = {"code": 400, "message": str(e), "data": None}
+
+    return JsonResponse(response_data)
+
+
+@csrf_exempt
+@require_POST
+def upd_information_view(request):
+    """旧版接口: 更新个人信息"""
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+        information = data.get('information')
+
+        from user.models import User
+        user = User.objects.get(username=username)
+        response_data = update_user_info(user_id=user.id, information=information)
+    except User.DoesNotExist:
+        response_data = {"code": 400, "message": "用户不存在", "data": None}
+    except Exception as e:
+        response_data = {"code": 400, "message": str(e), "data": None}
+
+    return JsonResponse(response_data)
+
+
+@csrf_exempt
+@require_POST
+def get_information_view(request):
+    """旧版接口: 获取个人信息"""
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+
+        from user.models import User
+        user = User.objects.get(username=username)
+        response_data = get_user_info(user_id=user.id, attributes=['information'])
+    except User.DoesNotExist:
+        response_data = {"code": 400, "message": "用户不存在", "data": None}
+    except Exception as e:
+        response_data = {"code": 400, "message": str(e), "data": None}
+
+    return JsonResponse(response_data)
+
+
+@csrf_exempt
+@require_POST
+def upd_target_view(request):
+    """旧版接口: 更新目标"""
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+        target = data.get('target')
+
+        from user.models import User
+        user = User.objects.get(username=username)
+        response_data = update_user_info(user_id=user.id, target=target)
+    except User.DoesNotExist:
+        response_data = {"code": 400, "message": "用户不存在", "data": None}
+    except Exception as e:
+        response_data = {"code": 400, "message": str(e), "data": None}
+
+    return JsonResponse(response_data)
+
+
+@csrf_exempt
+@require_POST
+def get_target_view(request):
+    """旧版接口: 获取目标"""
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+
+        from user.models import User
+        user = User.objects.get(username=username)
+        response_data = get_user_info(user_id=user.id, attributes=['target'])
+    except User.DoesNotExist:
+        response_data = {"code": 400, "message": "用户不存在", "data": None}
+    except Exception as e:
+        response_data = {"code": 400, "message": str(e), "data": None}
+
+    return JsonResponse(response_data)
