@@ -89,7 +89,7 @@
 - **请求体格式**：
 ```json
 {
-    "username": "用户ID",
+    "username": "用户ID", 
     "age": "年龄"
 }
 ```
@@ -237,7 +237,7 @@ Authorization: Token your_token_here
 ```json
 {
     "value": 2000
-}
+} 
 ```
 - **参数说明**：
   - `value`：每日目标热量(kcal)，必填，数字类型

@@ -213,19 +213,19 @@ def get_daily_meals(user_id: int, meal_date: str = None) -> ServiceResult:
                     'meal_food_id': food_item.id,
                     'food_id': food_item.food_item.id,
                     'name': food_item.food_item.name,
-                    'weight': food_item.weight,
-                    'calories': food_item.calories,
-                    'protein': food_item.protein,
-                    'carbohydrates': food_item.carbohydrates,
-                    'fat': food_item.fat,
+                    'weight': round(food_item.weight, 1),
+                    'calories': round(food_item.calories, 1),
+                    'protein': round(food_item.protein, 1),
+                    'carbohydrates': round(food_item.carbohydrates, 1),
+                    'fat': round(food_item.fat, 1),
                 })
 
             meals_data[meal_type] = {
                 'foods': foods_list,
-                'total_calories': meal_record.total_calories,
-                'total_protein': meal_record.total_protein,
-                'total_carbs': meal_record.total_carbs,
-                'total_fat': meal_record.total_fat,
+                'total_calories': round(meal_record.total_calories, 1),
+                'total_protein': round(meal_record.total_protein, 1),
+                'total_carbs': round(meal_record.total_carbs, 1),
+                'total_fat': round(meal_record.total_fat, 1),
             }
 
             daily_total_calories += meal_record.total_calories
@@ -239,10 +239,10 @@ def get_daily_meals(user_id: int, meal_date: str = None) -> ServiceResult:
         response_data = {
             "date": meal_date_obj.strftime('%Y-%m-%d'),
             "meals": meals_data,
-            "daily_total_calories": round(daily_total_calories, 2),
-            "daily_total_protein": round(daily_total_protein, 2),
-            "daily_total_carbs": round(daily_total_carbs, 2),
-            "daily_total_fat": round(daily_total_fat, 2),
+            "daily_total_calories": round(daily_total_calories, 1),
+            "daily_total_protein": round(daily_total_protein, 1),
+            "daily_total_carbs": round(daily_total_carbs, 1),
+            "daily_total_fat": round(daily_total_fat, 1),
         }
 
         # 如果能获取到推荐值,则添加到响应中

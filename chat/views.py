@@ -219,7 +219,7 @@ def chat_view(request):
 
         for _ in range(MAX_TURNS):
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o-mini",  # 使用OpenAI兼容模型
                 messages=messages,
                 tools=cast(List[ChatCompletionToolParam], tools_definition),
                 tool_choice="auto",
