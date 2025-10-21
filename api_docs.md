@@ -552,3 +552,103 @@ Authorization: Token your_token_here
   - `recommended_fat`：推荐的每日脂肪摄入量(g)，按每日热量的27.5%计算
   - 每个食物项包含完整的营养信息和唯一的`meal_food_id`
   - 如果用户未设置身体信息，推荐营养素字段将不会返回
+
+
+### 6. 食物图片识别（获取食物名称、重量及营养）
+
+- **接口地址**：`/api/nutrition/analyze/`
+- **请求方法**：POST
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
+- **请求体格式**：
+- 请求体格式：multipart/form-data（用于上传图片文件）
+- 字段名:image	类型:文件
+
+- **参数说明**：
+  - 待识别的食物图片
+
+- **响应示例**：
+```{
+    "success": true,
+    "data": {
+         "foods": [
+            {
+              "name": "食物全称（如“白米饭”“水煮西兰花”）",
+              "weight": 估算重量（数字，如150）,
+              "calories": 热量（数字，保留1位小数，如195.0）,
+              "protein": 蛋白质（数字，保留1位小数，如3.9）,
+              "carbs": 碳水化合物（数字，保留1位小数，如43.1）,
+              "fat": 脂肪（数字，保留1位小数，如0.5）,
+              "note": "补充说明（如“疑似糙米饭”“部分遮挡，按整体估算”，无则填空字符串）"
+            }
+          ],
+          "total": {
+            "total_calories": 所有食物热量总和（数字，保留1位小数）,
+            "total_protein": 所有食物蛋白质总和（数字，保留1位小数）,
+            "total_carbs": 所有食物碳水总和（数字，保留1位小数）,
+            "total_fat": 所有食物脂肪总和（数字，保留1位小数）
+          }
+    }
+}
+```
+
+### 7. 食物营养计算（已知食物名称与重量时）
+
+- **接口地址**：`/api/nutrition/calculate/`
+- **请求方法**：POST
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
+- **请求体格式**：
+```json
+{
+    "foods": [
+        {
+            "name": "食物名称（需包含烹饪方式，如“油炸鸡腿”“水煮西兰花”）",
+            "weight": "重量（数字，单位：克，需为正数）"
+        },
+        {
+            "name": "蒸红薯",
+            "weight": 180
+        }
+    ]
+}
+```
+
+- **响应示例**：
+```json
+{
+    "success": true,
+    "data": {
+        "foods": [
+            {
+                "name": "油炸鸡腿",
+                "weight": 120,
+                "calories": 288.0,
+                "protein": 21.6,
+                "carbs": 0.0,
+                "fat": 21.6
+            },
+            {
+                "name": "蒸红薯",
+                "weight": 180,
+                "calories": 172.8,
+                "protein": 3.2,
+                "carbs": 40.5,
+                "fat": 0.5
+            }
+        ],
+        "total": {
+            "total_calories": 460.8,
+            "total_protein": 24.8,
+            "total_carbs": 40.5,
+            "total_fat": 22.1
+        }
+    }
+}
+```
