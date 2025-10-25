@@ -299,3 +299,150 @@ def update_food_weight(user_id: int, meal_food_id: int, new_weight: float) -> Se
     except Exception as e:
         print(f"更新重量时发生错误: {e}")
         return {"code": 500, "message": "服务器内部错误", "data": None}
+
+
+def get_diet_suggestion(user_id: int, days: int = 7) -> ServiceResult:
+    """
+    根据用户最近的饮食记录和健康信息生成饮食建议(返回一整段文字)
+
+    Args:
+        user_id: 用户ID
+        days: 分析最近多少天的数据,默认7天
+    """
+    try:
+        from datetime import timedelta
+        from django.db.models import Avg, Sum
+
+        # 获取用户健康信息
+        try:
+            user_info = Information.objects.get(user_id=user_id)
+        except Information.DoesNotExist:
+            return {"code": 400, "message": "请先完善个人健康信息", "data": None}
+
+        # 计算推荐营养素
+        recommended_macros = calculate_recommended_macros(user_id)
+        if not recommended_macros:
+            return {"code": 400, "message": "无法计算推荐营养素配比", "data": None}
+
+        # 获取最近N天的饮食记录
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days-1)
+
+        meal_records = MealRecord.objects.filter(
+            user_id=user_id,
+            meal_date__gte=start_date,
+            meal_date__lte=end_date
+        )
+
+        if not meal_records.exists():
+            return {
+                "code": 400,
+                "message": f"最近{days}天没有饮食记录,请先添加饮食记录",
+                "data": None
+            }
+
+        # 统计分析
+        daily_stats = meal_records.values('meal_date').annotate(
+            daily_calories=Sum('total_calories'),
+            daily_protein=Sum('total_protein'),
+            daily_carbs=Sum('total_carbs'),
+            daily_fat=Sum('total_fat')
+        )
+
+        avg_calories = sum(d['daily_calories'] for d in daily_stats) / len(daily_stats) if daily_stats else 0
+        avg_protein = sum(d['daily_protein'] for d in daily_stats) / len(daily_stats) if daily_stats else 0
+        avg_carbs = sum(d['daily_carbs'] for d in daily_stats) / len(daily_stats) if daily_stats else 0
+        avg_fat = sum(d['daily_fat'] for d in daily_stats) / len(daily_stats) if daily_stats else 0
+
+        # 分析各餐次情况
+        breakfast_count = meal_records.filter(meal_type='breakfast').count()
+
+        # 生成建议文本
+        suggestion_parts = []
+
+        # 开头
+        suggestion_parts.append(f"根据您最近{days}天的饮食记录分析:")
+
+        # 1. 热量建议
+        target_calories = user_info.daily_calories
+        calorie_diff = avg_calories - target_calories
+        calorie_diff_percent = (calorie_diff / target_calories * 100) if target_calories > 0 else 0
+
+        suggestion_parts.append(f"\n您的平均每日热量摄入为{round(avg_calories, 1)}千卡,目标值为{target_calories}千卡。")
+
+        if abs(calorie_diff_percent) < 5:
+            suggestion_parts.append("热量摄入与目标接近,请继续保持!")
+        elif calorie_diff > 0:
+            suggestion_parts.append(f"热量摄入超出目标{round(abs(calorie_diff), 1)}千卡({round(abs(calorie_diff_percent), 1)}%),建议适当减少主食和油脂摄入。")
+        else:
+            suggestion_parts.append(f"热量摄入低于目标{round(abs(calorie_diff), 1)}千卡({round(abs(calorie_diff_percent), 1)}%),建议适当增加营养摄入,避免过度节食。")
+
+        # 2. 蛋白质建议
+        protein_diff = avg_protein - recommended_macros['protein']
+        protein_diff_percent = (protein_diff / recommended_macros['protein'] * 100)
+
+        suggestion_parts.append(f"\n蛋白质平均摄入{round(avg_protein, 1)}g/天,推荐值为{round(recommended_macros['protein'], 1)}g/天。")
+
+        if abs(protein_diff_percent) < 10:
+            suggestion_parts.append("蛋白质摄入符合推荐值。")
+        elif protein_diff < 0:
+            suggestion_parts.append("蛋白质摄入不足,建议增加鸡胸肉、鱼类、豆制品等优质蛋白来源。")
+        else:
+            suggestion_parts.append("蛋白质摄入充足,注意适量即可,过量摄入可能增加肾脏负担。")
+
+        # 3. 碳水化合物建议
+        carbs_diff_percent = (avg_carbs - recommended_macros['carbohydrates']) / recommended_macros['carbohydrates'] * 100
+
+        suggestion_parts.append(f"\n碳水化合物平均摄入{round(avg_carbs, 1)}g/天,推荐值为{round(recommended_macros['carbohydrates'], 1)}g/天。")
+
+        if abs(carbs_diff_percent) < 10:
+            suggestion_parts.append("碳水化合物摄入比例合理。")
+        elif carbs_diff_percent > 10:
+            suggestion_parts.append("碳水化合物摄入偏高,建议减少精制米面,增加粗粮和蔬菜比例。")
+        else:
+            suggestion_parts.append("碳水化合物摄入偏低,适量碳水是能量来源,建议合理摄入全谷物。")
+
+        # 4. 脂肪建议
+        fat_diff_percent = (avg_fat - recommended_macros['fat']) / recommended_macros['fat'] * 100
+
+        suggestion_parts.append(f"\n脂肪平均摄入{round(avg_fat, 1)}g/天,推荐值为{round(recommended_macros['fat'], 1)}g/天。")
+
+        if abs(fat_diff_percent) < 10:
+            suggestion_parts.append("脂肪摄入比例适中。")
+        elif fat_diff_percent > 10:
+            suggestion_parts.append("脂肪摄入偏高,建议减少油炸食品,选择蒸煮烹饪方式。")
+        else:
+            suggestion_parts.append("脂肪摄入偏低,适量健康脂肪(如坚果、橄榄油)对健康有益。")
+
+        # 5. 餐次建议
+        if breakfast_count < days * 0.7:
+            suggestion_parts.append("\n建议规律吃早餐,早餐对新陈代谢和一天的精力都很重要。")
+
+        # 6. 根据健康目标的建议
+        if user_info.target:
+            if "减肥" in user_info.target or "减脂" in user_info.target:
+                suggestion_parts.append("\n针对您的减脂目标:建议控制总热量摄入,增加蛋白质比例,适量运动,避免过度节食。")
+            elif "增肌" in user_info.target:
+                suggestion_parts.append("\n针对您的增肌目标:建议适当提高蛋白质摄入(1.6-2.2g/kg体重),配合力量训练。")
+            elif "维持" in user_info.target:
+                suggestion_parts.append("\n针对您的维持目标:继续保持均衡饮食和规律运动习惯即可。")
+
+        # 结尾
+        suggestion_parts.append("\n\n保持健康的饮食习惯,祝您早日达成目标!")
+
+        # 合并成一整段文字
+        suggestion_text = "".join(suggestion_parts)
+
+        return {
+            "code": 200,
+            "message": "生成饮食建议成功",
+            "data": {
+                "suggestion": suggestion_text
+            }
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"生成饮食建议时发生错误: {e}")
+        return {"code": 500, "message": "服务器内部错误", "data": None}

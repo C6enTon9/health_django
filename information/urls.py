@@ -10,6 +10,7 @@ urlpatterns = [
     path('update/<str:attribute_name>/', views.update_attribute_view, name='update_attribute'),
     path('get/<str:attribute_name>/', views.get_attribute_view, name='get_attribute'),
     path('health-metrics/', views.get_health_metrics_view, name='get_health_metrics'),
+    path('all/', views.get_all_info_view, name='get_all_info'),
 
     # 旧版兼容接口 - 向后兼容
     path('upd_height/', views.upd_height_view, name='upd_height'),

@@ -105,3 +105,63 @@ def get_health_metrics(user_id: int) -> ServiceResult:
     except Exception as e:
         print(f"获取健康指标时发生错误: {e}")
         return {"code": 500, "message": "服务器内部错误", "data": None}
+
+
+def get_all_user_info(user_id: int, days: int = 7) -> ServiceResult:
+    """
+    获取用户的所有个人信息,包括饮食建议
+
+    Args:
+        user_id: 用户ID
+        days: 分析最近多少天的饮食数据,默认7天
+
+    Returns:
+        包含所有用户信息和饮食建议的ServiceResult
+    """
+    try:
+        info_obj = Information.objects.get(user_id=user_id)
+
+        # 构建完整的用户信息数据
+        user_info_data = {
+            # 基本信息
+            "height": info_obj.height,
+            "weight": info_obj.weight,
+            "age": info_obj.age,
+            "gender": info_obj.gender,
+            "gender_display": info_obj.get_gender_display(),  # 中文显示
+            "target": info_obj.target,
+            "information": info_obj.Information,
+            "target_calories": info_obj.target_calories,
+
+            # 计算属性
+            "bmi": info_obj.bmi,
+            "bmi_category": info_obj.bmi_category,
+            "bmr": info_obj.bmr,
+            "daily_calories": info_obj.daily_calories,
+
+            # 用户名
+            "username": info_obj.user.username,
+        }
+
+        # 获取饮食建议
+        from diet.services import get_diet_suggestion
+        diet_suggestion_result = get_diet_suggestion(user_id=user_id, days=days)
+
+        # 如果成功获取到饮食建议,添加到返回数据中
+        if diet_suggestion_result['code'] == 200 and diet_suggestion_result['data']:
+            user_info_data['diet_suggestion'] = diet_suggestion_result['data']['suggestion']
+        else:
+            # 如果获取失败或没有数据,设置为None或提示信息
+            user_info_data['diet_suggestion'] = None
+
+        return {
+            "code": 200,
+            "message": "获取用户信息成功",
+            "data": user_info_data
+        }
+
+    except ObjectDoesNotExist:
+        return {"code": 400, "message": "用户的信息记录不存在", "data": None}
+    except Exception as e:
+        print(f"获取用户信息时发生错误: {e}")
+        return {"code": 500, "message": "服务器内部错误", "data": None}

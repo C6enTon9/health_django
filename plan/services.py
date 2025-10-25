@@ -65,22 +65,65 @@ def create_or_update_plans(user_id: int, **kwargs: Any) -> ServiceResult:
             return {"code": 500, "message": f"创建计划时发生数据库错误: {e}", "data": None}
 
 
-def get_user_plans(user_id: int, day_of_week: Optional[int] = None) -> ServiceResult:
+def get_user_plans(user_id: int, day_of_week: Optional[int] = None,
+                   created_after: Optional[str] = None, created_before: Optional[str] = None,
+                   limit: Optional[int] = None, offset: int = 0) -> ServiceResult:
     """
-    获取用户的周常计划。
+    获取用户的周常计划(支持查询所有历史数据)。
+
+    Args:
+        user_id: 用户ID
+        day_of_week: 星期几(1-7),可选
+        created_after: 创建时间起始(YYYY-MM-DD),可选
+        created_before: 创建时间结束(YYYY-MM-DD),可选
+        limit: 返回数量限制,可选(None表示返回所有)
+        offset: 偏移量,用于分页,默认0
     """
     try:
+        from datetime import datetime
+
         plans_query = Plan.objects.filter(user_id=user_id)
+
+        # 按星期几筛选
         if day_of_week is not None:
             plans_query = plans_query.filter(day_of_week=day_of_week)
 
+        # 按创建时间范围筛选
+        if created_after:
+            try:
+                after_date = datetime.strptime(created_after, '%Y-%m-%d')
+                plans_query = plans_query.filter(created_at__gte=after_date)
+            except ValueError:
+                return {"code": 300, "message": "created_after日期格式错误,应为YYYY-MM-DD", "data": None}
+
+        if created_before:
+            try:
+                before_date = datetime.strptime(created_before, '%Y-%m-%d')
+                # 包含整天,所以加一天
+                from datetime import timedelta
+                before_date = before_date + timedelta(days=1)
+                plans_query = plans_query.filter(created_at__lt=before_date)
+            except ValueError:
+                return {"code": 300, "message": "created_before日期格式错误,应为YYYY-MM-DD", "data": None}
+
+        # 获取总数(在分页前)
+        total_count = plans_query.count()
+
+        # 排序(按创建时间倒序,最新的在前)
+        plans_query = plans_query.order_by('-created_at', 'day_of_week', 'start_time')
+
+        # 分页
+        if limit is not None:
+            plans_query = plans_query[offset:offset + limit]
+
         plans_list = list(
-            plans_query.order_by('start_time').values(
-                "id", "title", "description", "day_of_week", 
+            plans_query.values(
+                "id", "title", "description", "day_of_week",
                 "start_time", "end_time", "is_completed",
+                "created_at", "updated_at"
             )
         )
-        
+
         for plan in plans_list:
             # 将 TimeField 对象格式化为 HH:MM 字符串
             if plan.get('start_time') and hasattr(plan['start_time'], 'strftime'):
@@ -88,10 +131,22 @@ def get_user_plans(user_id: int, day_of_week: Optional[int] = None) -> ServiceRe
             if plan.get('end_time') and hasattr(plan['end_time'], 'strftime'):
                 plan['end_time'] = plan['end_time'].strftime('%H:%M')
 
+            # 格式化日期时间
+            if plan.get('created_at'):
+                plan['created_at'] = plan['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            if plan.get('updated_at'):
+                plan['updated_at'] = plan['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+
         return {
             "code": 200,
             "message": "计划获取成功。" if plans_list else "您还没有任何相关计划。",
-            "data": {"plans": plans_list, "count": len(plans_list)},
+            "data": {
+                "plans": plans_list,
+                "count": len(plans_list),
+                "total": total_count,
+                "offset": offset,
+                "limit": limit
+            },
         }
     except Exception as e:
         return {"code": 500, "message": f"获取计划时发生错误: {e}", "data": None}

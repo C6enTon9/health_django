@@ -281,28 +281,346 @@ Authorization: Token your_token_here
   - 如果用户未设置自定义目标热量，返回值可能为null
   - 实际使用的每日热量值请通过`/api/information/health-metrics/`接口的`daily_calories`字段获取
 
-## PLAN API
+### 16. 获取用户所有信息(包含饮食建议)
 
-### 1. 获取计划
-
-- **接口地址**：`/api/plan/get_plan/`
+- **接口地址**：`/api/information/all/`
+- **请求方法**：POST
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
 - **请求体格式**：
 ```json
 {
-    "username": "用户ID"
+    "days": 7
 }
 ```
+- **参数说明**：
+  - `days`：分析最近多少天的饮食数据(可选,默认7天,取值范围1-30)
 
-### 2. 更新计划
+- **响应示例**：
+```json
+{
+    "code": 200,
+    "message": "获取用户信息成功",
+    "data": {
+        "username": "test_user",
+        "height": 175.0,
+        "weight": 70.0,
+        "age": 25,
+        "gender": "male",
+        "gender_display": "男",
+        "target": "减肥",
+        "information": "我是一名程序员",
+        "target_calories": 2000.0,
+        "bmi": 22.86,
+        "bmi_category": "正常",
+        "bmr": 1663.75,
+        "daily_calories": 1996.5,
+        "diet_suggestion": "根据您最近7天的饮食记录分析:\n您的平均每日热量摄入为1850.5千卡,目标值为2000千卡。热量摄入低于目标149.5千卡(7.5%),建议适当增加营养摄入,避免过度节食。\n蛋白质平均摄入75.2g/天,推荐值为87.5g/天。蛋白质摄入不足,建议增加鸡胸肉、鱼类、豆制品等优质蛋白来源。\n碳水化合物平均摄入220.3g/天,推荐值为262.5g/天。碳水化合物摄入偏低,适量碳水是能量来源,建议合理摄入全谷物。\n脂肪平均摄入60.1g/天,推荐值为61.1g/天。脂肪摄入比例适中。\n建议规律吃早餐,早餐对新陈代谢和一天的精力都很重要。\n针对您的减脂目标:建议控制总热量摄入,增加蛋白质比例,适量运动,避免过度节食。\n\n保持健康的饮食习惯,祝您早日达成目标!"
+    }
+}
+```
+- **返回字段说明**：
+  - `username`：用户名
+  - `height`：身高(cm)
+  - `weight`：体重(kg)
+  - `age`：年龄
+  - `gender`：性别代码（male/female）
+  - `gender_display`：性别显示（男/女）
+  - `target`：健康目标
+  - `information`：个人信息描述
+  - `target_calories`：每日目标热量(kcal)
+  - `bmi`：身体质量指数
+  - `bmi_category`：BMI分类（偏瘦/正常/偏胖/肥胖）
+  - `bmr`：基础代谢率(kcal/天)
+  - `daily_calories`：每日推荐热量(kcal/天)
+  - `diet_suggestion`：个性化饮食建议(纯文本,如果没有足够的饮食记录则为null)
 
-- **接口地址**：`/api/plan/upd_plan/`
+- **说明**：
+  - 一次性获取用户的所有基本信息、健康指标和个性化饮食建议
+  - 饮食建议基于用户最近N天的饮食记录和健康目标智能生成
+  - 如果用户信息不存在,返回400错误
+  - 如果没有足够的饮食记录,`diet_suggestion`字段将为null,但其他信息正常返回
+  - **本接口已整合原 `/api/diet/suggestion/` 接口的功能**
+
+## PLAN API（训练/饮食计划管理）
+
+### 1. 创建或更新计划
+
+- **接口地址**：`/api/plan/manage/`
+- **请求方法**：POST
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
+
+#### 创建新计划
 - **请求体格式**：
 ```json
 {
-    "username": "用户ID",
-    "new_info": "新的信息"//没有新信息则为空
+    "title": "晨跑",
+    "description": "30分钟慢跑",
+    "day_of_week": 1,
+    "start_time": "07:00",
+    "end_time": "07:30"
 }
 ```
+- **参数说明**：
+  - `title`：计划标题(必填)
+  - `description`：详细描述(可选)
+  - `day_of_week`：星期几,1-7代表周一到周日(必填)
+  - `start_time`：开始时间,格式HH:MM(必填)
+  - `end_time`：结束时间,格式HH:MM(必填)
+
+- **响应示例**：
+```json
+{
+    "code": 201,
+    "message": "成功创建了新计划 '晨跑'。",
+    "data": {
+        "created": 1,
+        "id": 1
+    }
+}
+```
+
+#### 更新现有计划
+- **请求体格式**：
+```json
+{
+    "id": 1,
+    "title": "晨跑改为晚跑",
+    "start_time": "18:00",
+    "end_time": "18:30"
+}
+```
+- **参数说明**：
+  - `id`：要更新的计划ID(必填)
+  - 其他字段：要更新的字段(可选,只传需要修改的字段)
+
+- **响应示例**：
+```json
+{
+    "code": 200,
+    "message": "计划更新成功。",
+    "data": {
+        "updated": 1
+    }
+}
+```
+
+### 2. 获取计划列表(支持查询所有历史数据)
+
+- **接口地址**：`/api/plan/list/`
+- **请求方法**：GET
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
+
+#### 查询参数(所有参数都是可选的):
+- `day_of_week`: 星期几(1-7),筛选指定星期的计划
+- `created_after`: 创建时间起始(YYYY-MM-DD),查询此日期之后创建的计划
+- `created_before`: 创建时间结束(YYYY-MM-DD),查询此日期之前创建的计划
+- `limit`: 返回数量限制,用于分页
+- `offset`: 分页偏移量,默认0
+
+#### 使用示例:
+
+**查询所有计划**:
+```
+GET /api/plan/list/
+```
+
+**查询周一的所有计划**:
+```
+GET /api/plan/list/?day_of_week=1
+```
+
+**分页查询(每页20条,第1页)**:
+```
+GET /api/plan/list/?limit=20&offset=0
+```
+
+**查询2025年1月的所有计划**:
+```
+GET /api/plan/list/?created_after=2025-01-01&created_before=2025-01-31
+```
+
+**组合查询(周一的计划,2025年的,每页10条)**:
+```
+GET /api/plan/list/?day_of_week=1&created_after=2025-01-01&limit=10&offset=0
+```
+
+- **响应示例**:
+```json
+{
+    "code": 200,
+    "message": "计划获取成功。",
+    "data": {
+        "plans": [
+            {
+                "id": 1,
+                "title": "晨跑",
+                "description": "30分钟慢跑",
+                "day_of_week": 1,
+                "start_time": "07:00",
+                "end_time": "07:30",
+                "is_completed": false,
+                "created_at": "2025-01-15 10:30:00",
+                "updated_at": "2025-01-15 10:30:00"
+            },
+            {
+                "id": 2,
+                "title": "健康早餐",
+                "description": "燕麦+鸡蛋+牛奶",
+                "day_of_week": 1,
+                "start_time": "08:00",
+                "end_time": "08:30",
+                "is_completed": true,
+                "created_at": "2025-01-10 09:00:00",
+                "updated_at": "2025-01-16 08:35:00"
+            }
+        ],
+        "count": 2,
+        "total": 25,
+        "offset": 0,
+        "limit": null
+    }
+}
+```
+
+- **返回字段说明**:
+  - `plans`: 计划数组
+  - `count`: 本次返回的计划数量
+  - `total`: 符合条件的总计划数量
+  - `offset`: 当前偏移量
+  - `limit`: 当前限制数量(null表示返回所有)
+  - `created_at`: 计划创建时间
+  - `updated_at`: 计划最后更新时间
+
+- **说明**:
+  - **默认不限制时间范围**,可以查询所有历史数据
+  - 结果按创建时间倒序排序(最新的在前)
+  - 支持灵活的组合查询和分页
+  - 适用于查看和管理所有训练/饮食计划
+
+### 3. 删除单个计划
+
+- **接口地址**：`/api/plan/manage/`
+- **请求方法**：POST
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
+- **请求体格式**：
+```json
+{
+    "action": "delete",
+    "plan_id": 1
+}
+```
+- **参数说明**：
+  - `action`：固定为"delete"
+  - `plan_id`：要删除的计划ID
+
+- **响应示例**：
+```json
+{
+    "code": 200,
+    "message": "ID为 1 的计划已成功删除。",
+    "data": {
+        "deleted": 1
+    }
+}
+```
+
+### 4. 批量删除计划
+
+- **接口地址**：`/api/plan/manage/`
+- **请求方法**：POST
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
+- **请求体格式**：
+```json
+{
+    "action": "delete_all",
+    "day_of_week": 1
+}
+```
+- **参数说明**：
+  - `action`：固定为"delete_all"
+  - `day_of_week`：星期几(可选,不传则删除所有计划)
+
+- **响应示例**：
+```json
+{
+    "code": 200,
+    "message": "成功清空了星期 1 的 3 条计划。",
+    "data": {
+        "deleted": 3
+    }
+}
+```
+
+### 5. 批量创建计划
+
+- **接口地址**：`/api/plan/manage/`
+- **请求方法**：POST
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
+- **请求体格式**：
+```json
+{
+    "action": "bulk_create",
+    "plans_data": [
+        {
+            "title": "周一晨跑",
+            "description": "30分钟",
+            "day_of_week": 1,
+            "start_time": "07:00",
+            "end_time": "07:30"
+        },
+        {
+            "title": "周二游泳",
+            "day_of_week": 2,
+            "start_time": "18:00",
+            "end_time": "19:00"
+        }
+    ]
+}
+```
+- **参数说明**：
+  - `action`：固定为"bulk_create"
+  - `plans_data`：计划数组,每个计划包含title、day_of_week、start_time、end_time等字段
+
+- **响应示例**：
+```json
+{
+    "code": 201,
+    "message": "成功为您批量创建了 2 条新计划。",
+    "data": {
+        "created": 2
+    }
+}
+```
+
+**说明**：
+- Plan表同时用于训练计划和饮食计划,通过title和description区分
+- 计划按星期几(day_of_week)循环,每周重复
+- 所有计划都按day_of_week和start_time排序
+- is_completed字段标记计划是否完成
 
 ## DIET API（饮食管理）
 
@@ -552,3 +870,47 @@ Authorization: Token your_token_here
   - `recommended_fat`：推荐的每日脂肪摄入量(g)，按每日热量的27.5%计算
   - 每个食物项包含完整的营养信息和唯一的`meal_food_id`
   - 如果用户未设置身体信息，推荐营养素字段将不会返回
+
+### 6. 获取饮食建议 (已废弃，请使用 `/api/information/all/`)
+
+> **注意**: 此接口已被整合到 `/api/information/all/` 接口中。建议使用新接口一次性获取所有用户信息和饮食建议。
+
+- **接口地址**：`/api/diet/suggestion/` (已废弃)
+- **请求方法**：POST
+- **认证要求**：需要Token认证
+- **请求头**：
+```
+Authorization: Token your_token_here
+```
+- **请求体格式**：
+```json
+{
+    "days": 7
+}
+```
+- **参数说明**：
+  - `days`：分析最近多少天的数据，可选，默认7天，取值范围1-30
+
+- **响应示例**：
+```json
+{
+    "code": 200,
+    "message": "生成饮食建议成功",
+    "data": {
+        "suggestion": "根据您最近7天的饮食记录分析:\n您的平均每日热量摄入为1850.5千卡,目标值为2000千卡。热量摄入低于目标149.5千卡(7.5%),建议适当增加营养摄入,避免过度节食。\n蛋白质平均摄入75.2g/天,推荐值为87.5g/天。蛋白质摄入不足,建议增加鸡胸肉、鱼类、豆制品等优质蛋白来源。\n碳水化合物平均摄入220.3g/天,推荐值为262.5g/天。碳水化合物摄入偏低,适量碳水是能量来源,建议合理摄入全谷物。\n脂肪平均摄入60.1g/天,推荐值为61.1g/天。脂肪摄入比例适中。\n建议规律吃早餐,早餐对新陈代谢和一天的精力都很重要。\n针对您的减脂目标:建议控制总热量摄入,增加蛋白质比例,适量运动,避免过度节食。\n\n保持健康的饮食习惯,祝您早日达成目标!"
+    }
+}
+```
+
+- **说明**：
+  - **此接口已废弃，请使用 `/api/information/all/` 接口代替**
+  - 根据用户最近N天的饮食记录和健康信息，智能生成个性化饮食建议
+  - 返回一整段文字建议，包含：
+    - 热量摄入分析和建议
+    - 蛋白质摄入分析和建议
+    - 碳水化合物摄入分析和建议
+    - 脂肪摄入分析和建议
+    - 餐次习惯建议(如早餐提醒)
+    - 基于用户健康目标的个性化建议
+  - 如果没有足够的饮食记录或未设置健康信息，会返回相应的错误提示
+

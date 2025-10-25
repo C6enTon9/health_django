@@ -12,7 +12,8 @@ from .services import (
     add_food_to_meal,
     remove_food_from_meal,
     get_daily_meals,
-    update_food_weight
+    update_food_weight,
+    get_diet_suggestion
 )
 from core.types import ServiceResult
 
@@ -289,3 +290,104 @@ def update_food_weight_view(request):
             "data": None
         }
         return JsonResponse(response_data, status=400)
+
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def get_diet_suggestion_view(request):
+    """
+    获取饮食建议
+
+    请求参数:
+    {
+        "days": 7  # 可选,分析最近多少天的数据,默认7天
+    }
+
+    返回示例:
+    {
+        "code": 200,
+        "message": "生成饮食建议成功",
+        "data": {
+            "analysis_period": "最近7天",
+            "record_days": 5,
+            "current_intake": {
+                "avg_calories": 1850.5,
+                "avg_protein": 75.2,
+                "avg_carbs": 220.3,
+                "avg_fat": 60.1
+            },
+            "recommended_intake": {
+                "calories": 2000,
+                "protein": 87.5,
+                "carbs": 262.5,
+                "fat": 61.1
+            },
+            "meal_stats": {
+                "breakfast": {
+                    "count": 5,
+                    "avg_calories": 450.0
+                },
+                "lunch": {
+                    "count": 5,
+                    "avg_calories": 700.0
+                },
+                "dinner": {
+                    "count": 4,
+                    "avg_calories": 600.0
+                }
+            },
+            "suggestions": [
+                {
+                    "type": "热量摄入",
+                    "status": "良好",
+                    "message": "您的平均每日热量摄入为1850.5千卡,与目标值2000千卡接近,请继续保持!"
+                },
+                {
+                    "type": "蛋白质",
+                    "status": "不足",
+                    "message": "蛋白质摄入75.2g/天,低于推荐值。建议增加鸡胸肉、鱼类、豆制品等优质蛋白来源。"
+                }
+            ]
+        }
+    }
+    """
+    try:
+        data = json.loads(request.body) if request.body else {}
+        days = data.get('days', 7)
+
+        # 验证days参数
+        try:
+            days = int(days)
+            if days < 1 or days > 30:
+                response_data: ServiceResult = {
+                    "code": 300,
+                    "message": "days参数必须在1-30之间",
+                    "data": None
+                }
+                return JsonResponse(response_data, status=400)
+        except (ValueError, TypeError):
+            response_data: ServiceResult = {
+                "code": 300,
+                "message": "days参数必须是整数",
+                "data": None
+            }
+            return JsonResponse(response_data, status=400)
+
+        response_data = get_diet_suggestion(
+            user_id=request.user.id,
+            days=days
+        )
+
+        http_status = 200 if response_data['code'] == 200 else 400
+        return JsonResponse(response_data, status=http_status)
+
+    except (json.JSONDecodeError, ValueError) as e:
+        response_data: ServiceResult = {
+            "code": 400,
+            "message": f"请求格式错误: {e}",
+            "data": None
+        }
+        return JsonResponse(response_data, status=400)
+

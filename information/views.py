@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 
-from .services import update_user_info, get_user_info, get_health_metrics, ALLOWED_FIELDS
+from .services import update_user_info, get_user_info, get_health_metrics, get_all_user_info, ALLOWED_FIELDS
 from core.types import ServiceResult
 
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -286,3 +286,55 @@ def get_target_view(request):
         response_data = {"code": 400, "message": str(e), "data": None}
 
     return JsonResponse(response_data)
+
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def get_all_info_view(request):
+    """
+    获取用户的所有个人信息,包括饮食建议
+
+    请求体参数:
+    - days: 分析最近多少天的饮食数据(可选,默认7天)
+
+    返回示例:
+    {
+        "code": 200,
+        "message": "获取用户信息成功",
+        "data": {
+            "username": "test_user",
+            "height": 175.0,
+            "weight": 70.0,
+            "age": 25,
+            "gender": "male",
+            "gender_display": "男",
+            "target": "减肥",
+            "information": "我是一名程序员",
+            "target_calories": 2000.0,
+            "bmi": 22.86,
+            "bmi_category": "正常",
+            "bmr": 1663.75,
+            "daily_calories": 1996.5,
+            "diet_suggestion": "根据您最近7天的饮食记录分析:..."
+        }
+    }
+    """
+    try:
+        data = json.loads(request.body) if request.body else {}
+        days = data.get('days', 7)  # 默认7天
+
+        # 验证 days 参数
+        if not isinstance(days, int) or days < 1 or days > 30:
+            return JsonResponse(
+                {"code": 300, "message": "参数 'days' 必须是 1 到 30 之间的整数", "data": None},
+                status=400
+            )
+    except json.JSONDecodeError:
+        days = 7  # 如果解析失败,使用默认值
+
+    response_data = get_all_user_info(user_id=request.user.id, days=days)
+    http_status = 200 if response_data['code'] == 200 else 400
+    return JsonResponse(response_data, status=http_status)
+

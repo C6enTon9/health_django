@@ -10,7 +10,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'your-default-insecure-key-for-
 
 DEBUG = os.environ.get('DEBUG', 'True') != 'False'
 
-ALLOWED_HOSTS_STR = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost,192.168.0.161')
+ALLOWED_HOSTS_STR = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost,192.168.0.175')
 ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_STR.split(',')]
 
 AUTH_USER_MODEL = 'user.User'

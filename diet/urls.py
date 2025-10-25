@@ -20,4 +20,7 @@ urlpatterns = [
 
     # 更新食物重量
     path('update_weight/', views.update_food_weight_view, name='update_weight'),
+
+    # 获取饮食建议
+    path('suggestion/', views.get_diet_suggestion_view, name='diet_suggestion'),
 ]
