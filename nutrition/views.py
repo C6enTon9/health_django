@@ -1,3 +1,4 @@
+import base64
 import os
 from django.http import JsonResponse
 from rest_framework.views import APIView
@@ -40,6 +41,71 @@ class FoodRecognitionView(APIView):
             os.remove(temp_path)
 
         # 5. 返回结果
+        return JsonResponse(result)
+
+
+class FoodRecognitionBase64View(APIView):
+    """新增：支持Base64格式图片的食物识别接口"""
+    parser_classes = [JSONParser]  # 处理JSON格式的Base64数据
+
+    # 关键：移除认证和权限校验
+    authentication_classes = []  # 不启用任何认证方式（如Token、Session）
+    permission_classes = []  # 允许所有用户访问（包括匿名用户）
+
+    def post(self, request):
+        # 1. 验证请求数据
+        if "image_base64" not in request.data:
+            return JsonResponse(
+                {"error": "请提供Base64格式图片，字段名为'image_base64'"},
+                status=400
+            )
+
+        base64_str = request.data["image_base64"].strip()
+        if not base64_str:
+            return JsonResponse(
+                {"error": "Base64字符串不能为空"},
+                status=400
+            )
+
+        # 2. 处理Base64字符串（去除前缀，如"data:image/jpeg;base64,"）
+        try:
+            # 分割可能存在的前缀（如"data:image/png;base64,"）
+            if "base64," in base64_str:
+                base64_data = base64_str.split("base64,")[1]
+            else:
+                base64_data = base64_str
+
+            # 解码Base64为二进制数据
+            image_bytes = base64.b64decode(base64_data)
+        except Exception as e:
+            return JsonResponse(
+                {"error": f"Base64解码失败：{str(e)}（请检查格式是否正确）"},
+                status=400
+            )
+
+        # 3. 保存解码后的图片到临时目录
+        try:
+            # 生成唯一文件名（保留.jpg后缀，避免识别模型格式问题）
+            temp_filename = f"food_base64_{os.urandom(10).hex()}.jpg"
+            temp_path = TEMP_DIR / temp_filename
+
+            with open(temp_path, "wb") as f:
+                f.write(image_bytes)
+        except Exception as e:
+            return JsonResponse(
+                {"error": f"图片保存失败：{str(e)}"},
+                status=500
+            )
+
+        # 4. 调用服务层识别（复用原有FoodAnalysisService，无需修改）
+        service = FoodAnalysisService()
+        result = service.analyze_image(temp_path)  # 传入临时文件路径
+
+        # 5. 清理临时文件
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+        # 6. 返回识别结果（与原有接口格式一致，便于前端统一处理）
         return JsonResponse(result)
 
 
