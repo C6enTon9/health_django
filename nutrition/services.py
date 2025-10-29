@@ -120,7 +120,7 @@ class FoodAnalysisService:
             print(f"【分析时间】{timezone.now().strftime('%Y-%m-%d %H:%M:%S')}")
             print("【食物识别结果】")
             for food in result["foods"]:
-                print(f"- {food['name']}（{food['confidence']}）：{food['weight']}g，{food['calories']}kcal")
+                print(f"- {food['name']}：{food['weight']}g，{food['calories']}kcal")
                 print(f"  营养：蛋白质{food['protein']}g | 碳水{food['carbs']}g | 脂肪{food['fat']}g")
             print("\n【总计】")
             print(f"总热量：{result['total']['total_calories']}kcal | 总蛋白质：{result['total']['total_protein']}g")
