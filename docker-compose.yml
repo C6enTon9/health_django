@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: health_django
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    volumes:
+      # 持久化数据库文件
+      - ./db.sqlite3:/app/db.sqlite3
+      # 持久化临时图片
+      - ./temp_images:/app/temp_images
+      # 持久化静态文件
+      - ./staticfiles:/app/staticfiles
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-django-insecure-default-key-please-change}
+      - DEBUG=${DEBUG:-False}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8088/admin/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - health_network
+
+networks:
+  health_network:
+    driver: bridge
