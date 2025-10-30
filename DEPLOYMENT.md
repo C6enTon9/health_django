@@ -334,7 +334,7 @@ chmod 666 db.sqlite3
 chmod -R 777 temp_images
 ```
 
-## 快速部署脚本
+## 🚀 快速部署脚本
 
 创建一键部署脚本 `deploy.sh`：
 
@@ -342,33 +342,53 @@ chmod -R 777 temp_images
 #!/bin/bash
 set -e
 
-echo "开始部署 Health Django 项目..."
+echo "=========================================="
+echo "Health Django 项目一键部署脚本"
+echo "=========================================="
+
+# 颜色定义
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
 
 # 拉取最新代码
-echo "1. 拉取最新代码..."
+echo -e "${YELLOW}[1/6] 拉取最新代码...${NC}"
 git pull origin main
 
 # 停止旧容器
-echo "2. 停止旧容器..."
-docker-compose down
+echo -e "${YELLOW}[2/6] 停止旧容器...${NC}"
+docker-compose down || docker stop health_django 2>/dev/null || true
 
-# 构建并启动新容器
-echo "3. 构建并启动容器..."
-docker-compose up -d --build
+# 构建新镜像
+echo -e "${YELLOW}[3/6] 构建Docker镜像...${NC}"
+docker-compose build || docker build -t health_django:latest .
+
+# 启动容器
+echo -e "${YELLOW}[4/6] 启动容器...${NC}"
+docker-compose up -d
 
 # 等待容器启动
-echo "4. 等待容器启动..."
+echo -e "${YELLOW}[5/6] 等待容器启动...${NC}"
 sleep 10
 
-# 查看状态
-echo "5. 检查容器状态..."
-docker-compose ps
+# 检查容器状态
+echo -e "${YELLOW}[6/6] 检查容器状态...${NC}"
+if docker ps | grep -q health_django; then
+    echo -e "${GREEN}✓ 容器启动成功${NC}"
+    docker ps | grep health_django
 
-# 显示日志
-echo "6. 显示最近日志..."
-docker-compose logs --tail=50 web
-
-echo "部署完成！访问 http://$(hostname -I | awk '{print $1}'):8088"
+    echo ""
+    echo -e "${GREEN}=========================================="
+    echo "部署完成！"
+    echo "访问地址: http://$(hostname -I | awk '{print $1}'):8088"
+    echo "API文档: http://$(hostname -I | awk '{print $1}'):8088/swagger/"
+    echo -e "==========================================${NC}"
+else
+    echo -e "${RED}✗ 容器启动失败${NC}"
+    docker logs health_django
+    exit 1
+fi
 ```
 
 使用方法：
@@ -376,3 +396,116 @@ echo "部署完成！访问 http://$(hostname -I | awk '{print $1}'):8088"
 chmod +x deploy.sh
 ./deploy.sh
 ```
+
+## 🔒 生产环境配置
+
+### 1. 使用Nginx反向代理
+
+创建Nginx配置 `/etc/nginx/sites-available/health_django`：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    client_max_body_size 20M;
+
+    location / {
+        proxy_pass http://127.0.0.1:8088;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /static/ {
+        alias /path/to/health_django/staticfiles/;
+        expires 30d;
+    }
+}
+```
+
+启用配置：
+```bash
+sudo ln -s /etc/nginx/sites-available/health_django /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### 2. 配置HTTPS (Let's Encrypt)
+
+```bash
+# 安装certbot
+sudo apt install certbot python3-certbot-nginx
+
+# 获取SSL证书
+sudo certbot --nginx -d your-domain.com
+
+# 自动续期
+sudo certbot renew --dry-run
+```
+
+### 3. 数据备份脚本
+
+创建备份脚本 `backup.sh`：
+
+```bash
+#!/bin/bash
+BACKUP_DIR="/backup/health_django"
+DATE=$(date +%Y%m%d_%H%M%S)
+PROJECT_DIR=~/health_django
+
+mkdir -p $BACKUP_DIR
+
+# 备份数据库
+cp $PROJECT_DIR/db.sqlite3 $BACKUP_DIR/db_$DATE.sqlite3
+
+# 备份图片
+tar -czf $BACKUP_DIR/temp_images_$DATE.tar.gz -C $PROJECT_DIR temp_images/
+
+# 保留最近7天的备份
+find $BACKUP_DIR -name "db_*.sqlite3" -mtime +7 -delete
+find $BACKUP_DIR -name "temp_images_*.tar.gz" -mtime +7 -delete
+
+echo "备份完成: $DATE"
+```
+
+定时备份（每天凌晨2点）：
+```bash
+chmod +x backup.sh
+crontab -e
+# 添加: 0 2 * * * /path/to/backup.sh
+```
+
+## 📊 监控和维护
+
+### 资源监控
+
+```bash
+# 查看容器资源使用
+docker stats health_django
+
+# 查看容器健康状态
+docker inspect --format='{{.State.Health.Status}}' health_django
+```
+
+### 日志管理
+
+```bash
+# 配置日志轮转（在docker-compose.yml中）
+logging:
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+```
+
+## 🔗 相关链接
+
+- **项目仓库**: https://github.com/C6enTon9/health_django
+- **Django文档**: https://docs.djangoproject.com/
+- **DRF文档**: https://www.django-rest-framework.org/
+
+---
+
+**最后更新**: 2025-10-30
