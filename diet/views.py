@@ -395,13 +395,14 @@ def get_diet_suggestion_view(request):
 
 @csrf_exempt
 @api_view(['POST'])
+@authentication_classes([TokenAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
 def batch_add_foods_view(request):
     """
     批量添加食物到餐次
 
     请求参数:
     {
-        "user_id"： 1，
         "meal_type": "lunch",  # breakfast/lunch/dinner
         "meal_date": "2025-10-31",
         "total_calories": 366,
@@ -448,7 +449,6 @@ def batch_add_foods_view(request):
         data = json.loads(request.body)
 
         # 获取必需参数
-        user_id = data.get('user_id')
         meal_type = data.get('meal_type')
         meal_date = data.get('meal_date')
         total_calories = data.get('total_calories')
@@ -458,10 +458,10 @@ def batch_add_foods_view(request):
         foods = data.get('foods')
 
         # 验证必需参数
-        if not all([user_id, meal_type, meal_date, foods]):
+        if not all([meal_type, meal_date, foods]):
             response_data: ServiceResult = {
                 "code": 300,
-                "message": "缺少必要参数: user_id, meal_type, meal_date, foods",
+                "message": "缺少必要参数: meal_type, meal_date, foods",
                 "data": None
             }
             return JsonResponse(response_data, status=400)
@@ -494,7 +494,7 @@ def batch_add_foods_view(request):
 
         # 调用服务函数
         response_data = batch_add_foods_to_meal(
-            user_id=user_id,
+            user_id=request.user.id,
             meal_type=meal_type,
             meal_date=meal_date,
             total_calories=float(total_calories),

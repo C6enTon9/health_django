@@ -315,7 +315,6 @@ def batch_add_foods_to_meal(
     批量添加食物到餐次记录
 
     Args:
-        user_id: 用户ID
         meal_type: 餐次类型 (breakfast/lunch/dinner)
         meal_date: 日期(YYYY-MM-DD格式)
         total_calories: 该餐次总热量
