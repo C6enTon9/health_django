@@ -12,6 +12,9 @@ urlpatterns = [
     # 添加食物到餐次
     path('add_food/', views.add_food_view, name='add_food'),
 
+    # 批量添加食物到餐次
+    path('batch_add_foods/', views.batch_add_foods_view, name='batch_add_foods'),
+
     # 从餐次删除食物
     path('remove_food/', views.remove_food_view, name='remove_food'),
 

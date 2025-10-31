@@ -301,6 +301,125 @@ def update_food_weight(user_id: int, meal_food_id: int, new_weight: float) -> Se
         return {"code": 500, "message": "服务器内部错误", "data": None}
 
 
+def batch_add_foods_to_meal(
+    user_id: int,
+    meal_type: str,
+    meal_date: str,
+    total_calories: float,
+    total_protein: float,
+    total_carbs: float,
+    total_fat: float,
+    foods: List[Dict[str, Any]]
+) -> ServiceResult:
+    """
+    批量添加食物到餐次记录
+
+    Args:
+        user_id: 用户ID
+        meal_type: 餐次类型 (breakfast/lunch/dinner)
+        meal_date: 日期(YYYY-MM-DD格式)
+        total_calories: 该餐次总热量
+        total_protein: 该餐次总蛋白质
+        total_carbs: 该餐次总碳水化合物
+        total_fat: 该餐次总脂肪
+        foods: 食物数组，每个元素包含:
+            - name: 食物名称
+            - weight: 重量(克)
+            - calories: 热量
+            - protein: 蛋白质
+            - carbohydrates: 碳水化合物
+            - fat: 脂肪
+
+    Returns:
+        ServiceResult: 包含操作结果的字典
+    """
+    try:
+        # 处理日期
+        try:
+            meal_date_obj = datetime.strptime(meal_date, '%Y-%m-%d').date()
+        except ValueError:
+            return {"code": 300, "message": "日期格式错误,应为YYYY-MM-DD", "data": None}
+
+        # 验证meal_type
+        valid_meal_types = ['breakfast', 'lunch', 'dinner']
+        if meal_type not in valid_meal_types:
+            return {"code": 300, "message": f"餐次类型错误,应为{valid_meal_types}之一", "data": None}
+
+        # 验证foods数组
+        if not foods or not isinstance(foods, list):
+            return {"code": 300, "message": "foods参数必须为非空数组", "data": None}
+
+        # 获取或创建餐次记录
+        meal_record, created = MealRecord.objects.get_or_create(
+            user_id=user_id,
+            meal_date=meal_date_obj,
+            meal_type=meal_type,
+            defaults={
+                'total_calories': total_calories,
+                'total_protein': total_protein,
+                'total_carbs': total_carbs,
+                'total_fat': total_fat,
+            }
+        )
+
+        # 如果餐次记录已存在,更新总计
+        if not created:
+            meal_record.total_calories = total_calories
+            meal_record.total_protein = total_protein
+            meal_record.total_carbs = total_carbs
+            meal_record.total_fat = total_fat
+            meal_record.save()
+
+        # 批量创建食物项
+        meal_food_items = []
+        for food_data in foods:
+            # 验证必需字段
+            required_fields = ['name', 'weight', 'calories', 'protein', 'carbohydrates', 'fat']
+            missing_fields = [field for field in required_fields if field not in food_data]
+            if missing_fields:
+                return {
+                    "code": 300,
+                    "message": f"食物数据缺少必需字段: {', '.join(missing_fields)}",
+                    "data": None
+                }
+
+            meal_food_item = MealFoodItem(
+                meal_record=meal_record,
+                food_item=None,  # 不关联FoodItem
+                food_item_name=food_data['name'],
+                weight=food_data['weight'],
+                calories=food_data['calories'],
+                protein=food_data['protein'],
+                carbohydrates=food_data['carbohydrates'],
+                fat=food_data['fat']
+            )
+            meal_food_items.append(meal_food_item)
+
+        # 批量插入数据库
+        MealFoodItem.objects.bulk_create(meal_food_items)
+
+        return {
+            "code": 200,
+            "message": f"成功添加{len(meal_food_items)}个食物项到{meal_record.get_meal_type_display()}",
+            "data": {
+                "meal_record_id": meal_record.id,
+                "meal_type": meal_type,
+                "meal_date": meal_date,
+                "foods_count": len(meal_food_items),
+                "total_calories": total_calories,
+                "total_protein": total_protein,
+                "total_carbs": total_carbs,
+                "total_fat": total_fat,
+            }
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"批量添加食物时发生错误: {e}")
+        return {"code": 500, "message": "服务器内部错误", "data": None}
+
+
 def get_diet_suggestion(user_id: int, days: int = 7) -> ServiceResult:
     """
     根据用户最近的饮食记录和健康信息生成饮食建议(返回一整段文字)

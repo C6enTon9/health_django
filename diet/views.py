@@ -13,7 +13,8 @@ from .services import (
     remove_food_from_meal,
     get_daily_meals,
     update_food_weight,
-    get_diet_suggestion
+    get_diet_suggestion,
+    batch_add_foods_to_meal
 )
 from core.types import ServiceResult
 
@@ -378,6 +379,129 @@ def get_diet_suggestion_view(request):
         response_data = get_diet_suggestion(
             user_id=request.user.id,
             days=days
+        )
+
+        http_status = 200 if response_data['code'] == 200 else 400
+        return JsonResponse(response_data, status=http_status)
+
+    except (json.JSONDecodeError, ValueError) as e:
+        response_data: ServiceResult = {
+            "code": 400,
+            "message": f"请求格式错误: {e}",
+            "data": None
+        }
+        return JsonResponse(response_data, status=400)
+
+
+@csrf_exempt
+@api_view(['POST'])
+def batch_add_foods_view(request):
+    """
+    批量添加食物到餐次
+
+    请求参数:
+    {
+        "user_id"： 1，
+        "meal_type": "lunch",  # breakfast/lunch/dinner
+        "meal_date": "2025-10-31",
+        "total_calories": 366,
+        "total_protein": 37.3,
+        "total_carbs": 43.3,
+        "total_fat": 4.2,
+        "foods": [
+            {
+                "name": "米饭",
+                "weight": 150,
+                "calories": 174,
+                "protein": 4.0,
+                "carbohydrates": 39.0,
+                "fat": 0.3
+            },
+            {
+                "name": "鸡胸肉",
+                "weight": 100,
+                "calories": 165,
+                "protein": 31.0,
+                "carbohydrates": 0,
+                "fat": 3.6
+            }
+        ]
+    }
+
+    返回示例:
+    {
+        "code": 200,
+        "message": "成功添加2个食物项到午餐",
+        "data": {
+            "meal_record_id": 1,
+            "meal_type": "lunch",
+            "meal_date": "2025-10-31",
+            "foods_count": 2,
+            "total_calories": 366,
+            "total_protein": 37.3,
+            "total_carbs": 43.3,
+            "total_fat": 4.2
+        }
+    }
+    """
+    try:
+        data = json.loads(request.body)
+
+        # 获取必需参数
+        user_id = data.get('user_id')
+        meal_type = data.get('meal_type')
+        meal_date = data.get('meal_date')
+        total_calories = data.get('total_calories')
+        total_protein = data.get('total_protein')
+        total_carbs = data.get('total_carbs')
+        total_fat = data.get('total_fat')
+        foods = data.get('foods')
+
+        # 验证必需参数
+        if not all([user_id, meal_type, meal_date, foods]):
+            response_data: ServiceResult = {
+                "code": 300,
+                "message": "缺少必要参数: user_id, meal_type, meal_date, foods",
+                "data": None
+            }
+            return JsonResponse(response_data, status=400)
+
+        if total_calories is None or total_protein is None or total_carbs is None or total_fat is None:
+            response_data: ServiceResult = {
+                "code": 300,
+                "message": "缺少必要参数: total_calories, total_protein, total_carbs, total_fat",
+                "data": None
+            }
+            return JsonResponse(response_data, status=400)
+
+        # 验证meal_type
+        if meal_type not in ['breakfast', 'lunch', 'dinner']:
+            response_data: ServiceResult = {
+                "code": 300,
+                "message": "meal_type必须是breakfast/lunch/dinner之一",
+                "data": None
+            }
+            return JsonResponse(response_data, status=400)
+
+        # 验证foods格式
+        if not isinstance(foods, list) or len(foods) == 0:
+            response_data: ServiceResult = {
+                "code": 300,
+                "message": "foods必须是非空数组",
+                "data": None
+            }
+            return JsonResponse(response_data, status=400)
+
+        # 调用服务函数
+        response_data = batch_add_foods_to_meal(
+            user_id=user_id,
+            meal_type=meal_type,
+            meal_date=meal_date,
+            total_calories=float(total_calories),
+            total_protein=float(total_protein),
+            total_carbs=float(total_carbs),
+            total_fat=float(total_fat),
+            foods=foods
         )
 
         http_status = 200 if response_data['code'] == 200 else 400

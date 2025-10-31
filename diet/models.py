@@ -100,8 +100,13 @@ class MealFoodItem(models.Model):
     food_item = models.ForeignKey(
         FoodItem,
         on_delete=models.CASCADE,
-        verbose_name="食物信息"
+        verbose_name="食物信息",
+        null=True,
+        blank=True
     )
+
+    # 食物名称(用于记录无对应food_item的食物)
+    food_item_name = models.CharField(max_length=200, verbose_name="食物名称", null=True, blank=True)
 
     # 实际重量
     weight = models.FloatField(verbose_name="重量(g)")
