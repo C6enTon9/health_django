@@ -209,10 +209,16 @@ def get_daily_meals(user_id: int, meal_date: str = None) -> ServiceResult:
             # 获取该餐次的所有食物
             foods_list = []
             for food_item in meal_record.food_items.all():
+                if food_item.food_item:
+                    food_name = food_item.food_item.name
+                    food_id = food_item.food_item.id
+                else:
+                    food_name = food_item.food_item_name # 兜底避免空值
+                    food_id = None  # 无对应食物时id为None
                 foods_list.append({
                     'meal_food_id': food_item.id,
-                    'food_id': food_item.food_item.id,
-                    'name': food_item.food_item.name,
+                    'food_id': food_id,
+                    'name': food_name,
                     'weight': round(food_item.weight, 1),
                     'calories': round(food_item.calories, 1),
                     'protein': round(food_item.protein, 1),
